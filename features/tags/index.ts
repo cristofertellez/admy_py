@@ -1,0 +1,1 @@
+export { TagsService } from "./service";

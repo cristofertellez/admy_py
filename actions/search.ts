@@ -1,0 +1,128 @@
+"use server";
+
+import { query } from "@/lib/turso/client";
+import { getUser } from "@/lib/auth";
+
+export interface SearchResult {
+  id: string;
+  type: "project" | "task" | "client" | "milestone";
+  title: string;
+  subtitle: string;
+  url: string;
+  status?: string;
+  priority?: string;
+}
+
+export async function globalSearch(
+  _prevState: unknown,
+  formData: FormData
+): Promise<{ results?: SearchResult[]; error?: string }> {
+  try {
+    const searchTerm = (formData.get("query") as string)?.trim();
+    if (!searchTerm || searchTerm.length < 2) {
+      return { results: [] };
+    }
+
+    const user = await getUser();
+    if (!user) return { error: "Not authenticated." };
+
+    const pattern = `%${searchTerm.toLowerCase()}%`;
+    const results: SearchResult[] = [];
+
+    const [projectsRes, tasksRes, clientsRes, milestonesRes] = await Promise.allSettled([
+      query<Record<string, unknown>>(
+        `SELECT p.id, p.name, p.status, c.company_name
+         FROM projects p
+         LEFT JOIN clients c ON c.id = p.client_id
+         WHERE (lower(p.name) LIKE ? OR lower(p.description) LIKE ?)
+           AND p.is_active = 1
+         LIMIT 5`,
+        [pattern, pattern],
+      ),
+      query<Record<string, unknown>>(
+        `SELECT t.id, t.title, t.status, t.priority, p.name AS project_name
+         FROM tasks t
+         LEFT JOIN projects p ON p.id = t.project_id
+         WHERE (lower(t.title) LIKE ? OR lower(t.description) LIKE ?)
+           AND t.is_active = 1
+         LIMIT 5`,
+        [pattern, pattern],
+      ),
+      query<Record<string, unknown>>(
+        `SELECT id, company_name, email, status
+         FROM clients
+         WHERE (lower(company_name) LIKE ? OR lower(email) LIKE ? OR lower(contact_name) LIKE ?)
+           AND is_active = 1
+           AND deleted_at IS NULL
+         LIMIT 5`,
+        [pattern, pattern, pattern],
+      ),
+      query<Record<string, unknown>>(
+        `SELECT m.id, m.title, m.status, p.name AS project_name, m.project_id
+         FROM milestones m
+         LEFT JOIN projects p ON p.id = m.project_id
+         WHERE (lower(m.title) LIKE ? OR lower(m.description) LIKE ?)
+           AND m.is_active = 1
+         LIMIT 5`,
+        [pattern, pattern],
+      ),
+    ]);
+
+    if (projectsRes.status === "fulfilled") {
+      for (const p of projectsRes.value) {
+        results.push({
+          id: p.id as string,
+          type: "project",
+          title: p.name as string,
+          subtitle: p.company_name ? `Client: ${p.company_name}` : "Project",
+          url: `/dashboard/projects/${p.id}`,
+          status: p.status as string,
+        });
+      }
+    }
+
+    if (tasksRes.status === "fulfilled") {
+      for (const t of tasksRes.value) {
+        results.push({
+          id: t.id as string,
+          type: "task",
+          title: t.title as string,
+          subtitle: t.project_name ? `Project: ${t.project_name}` : "Task",
+          url: `/dashboard/tasks/${t.id}`,
+          status: t.status as string,
+          priority: t.priority as string,
+        });
+      }
+    }
+
+    if (clientsRes.status === "fulfilled") {
+      for (const c of clientsRes.value) {
+        results.push({
+          id: c.id as string,
+          type: "client",
+          title: c.company_name as string,
+          subtitle: (c.email as string) || "Client",
+          url: `/dashboard/clients/${c.id}`,
+          status: c.status as string,
+        });
+      }
+    }
+
+    if (milestonesRes.status === "fulfilled") {
+      for (const m of milestonesRes.value) {
+        results.push({
+          id: m.id as string,
+          type: "milestone",
+          title: m.title as string,
+          subtitle: m.project_name ? `Project: ${m.project_name}` : "Milestone",
+          url: `/dashboard/projects/${m.project_id}`,
+          status: m.status as string,
+        });
+      }
+    }
+
+    return { results };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Search failed." };
+  }
+}
