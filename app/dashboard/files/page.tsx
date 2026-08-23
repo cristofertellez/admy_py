@@ -1,9 +1,11 @@
+import { requirePermission } from "@/lib/auth";
 import { FilesService } from "@/features/files";
 import { FilesTable } from "./files-table";
 
 export const metadata = { title: "Files" };
 
 export default async function FilesPage() {
+  await requirePermission("files.download");
   const { data: files } = await FilesService.list({ pageSize: 50 });
 
   return (

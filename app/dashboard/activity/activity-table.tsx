@@ -1,18 +1,11 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, PaginationState } from "@tanstack/react-table";
 import { DataTable } from "@/components/tables/data-table";
 import { Badge } from "@/components/shared/badge";
+import type { ActivityLog } from "@/features/activity";
 
-interface ActivityLogRow {
-  id: string;
-  action: string;
-  entity: string;
-  created_at: string;
-  users?: { first_name: string; last_name: string } | null;
-}
-
-const columns: ColumnDef<ActivityLogRow>[] = [
+const columns: ColumnDef<ActivityLog>[] = [
   {
     accessorKey: "action",
     header: "Action",
@@ -26,10 +19,10 @@ const columns: ColumnDef<ActivityLogRow>[] = [
   {
     id: "user",
     header: "User",
-    cell: ({ row }) => {
-      const u = row.original.users;
-      return u ? `${u.first_name} ${u.last_name}` : "—";
-    },
+    cell: ({ row }) =>
+      row.original.user_first_name && row.original.user_last_name
+        ? `${row.original.user_first_name} ${row.original.user_last_name}`
+        : "—",
   },
   {
     accessorKey: "created_at",
@@ -38,13 +31,37 @@ const columns: ColumnDef<ActivityLogRow>[] = [
   },
 ];
 
-export function ActivityTable({ logs }: { logs: Record<string, unknown>[] }) {
+interface ActivityTableProps {
+  logs: ActivityLog[];
+  total: number;
+  pageIndex: number;
+  pageSize: number;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onPaginationChange: (pagination: PaginationState) => void;
+}
+
+export function ActivityTable({
+  logs,
+  total,
+  pageIndex,
+  pageSize,
+  searchValue,
+  onSearchChange,
+  onPaginationChange,
+}: ActivityTableProps) {
   return (
     <DataTable
       columns={columns}
-      data={logs as unknown as ActivityLogRow[]}
+      data={logs}
+      totalCount={total}
       searchColumn="action"
       searchPlaceholder="Search actions..."
+      searchValue={searchValue}
+      onSearchChange={onSearchChange}
+      onPaginationChange={onPaginationChange}
+      pageIndex={pageIndex}
+      pageSize={pageSize}
     />
   );
 }

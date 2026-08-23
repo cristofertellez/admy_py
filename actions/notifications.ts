@@ -8,7 +8,7 @@ export async function markAsRead(notificationId: string) {
   try {
     const user = await getUser();
     if (!user) return { error: "Unauthenticated." };
-    await NotificationsService.markAsRead(notificationId);
+    await NotificationsService.markAsRead(notificationId, user.id);
     revalidatePath("/dashboard/notifications");
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to mark as read." };

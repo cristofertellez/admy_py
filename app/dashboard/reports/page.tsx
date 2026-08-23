@@ -1,3 +1,4 @@
+import { requireAuth } from "@/lib/auth";
 import { DashboardService } from "@/features/dashboard";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
 import { ReportsCharts } from "./reports-charts";
@@ -7,11 +8,13 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Reports" };
 
 export default async function ReportsPage() {
-  const stats = await DashboardService.getDeveloperStats();
+  const user = await requireAuth();
+  const stats = await DashboardService.getStats(user);
 
-  const totalIntermediaries = await countRows(
-    `SELECT COUNT(*) AS total FROM users WHERE is_active = 1`,
-  );
+  const isDeveloper = user.role === "Developer";
+  const totalIntermediaries = isDeveloper
+    ? await countRows(`SELECT COUNT(*) AS total FROM users WHERE is_active = 1`)
+    : 0;
 
   const displayStats = [
     { label: "Total Projects", value: stats.totalProjects },
@@ -22,7 +25,7 @@ export default async function ReportsPage() {
     { label: "Pending Tasks", value: stats.pendingTasks },
     { label: "Total Clients", value: stats.totalClients },
     { label: "Active Clients", value: stats.activeClients },
-    { label: "Active Intermediaries", value: totalIntermediaries },
+    ...(isDeveloper ? [{ label: "Active Intermediaries", value: totalIntermediaries }] : []),
   ];
 
   const taskChartData = [

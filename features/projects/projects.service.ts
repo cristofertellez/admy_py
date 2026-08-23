@@ -1,4 +1,5 @@
 import { query, queryOne, countRows, newId, type InValue } from "@/lib/turso/client";
+import { assertProjectVisible, projectScope } from "@/lib/auth-scope";
 import type { Project } from "@/types";
 import type { ProjectFilters, ProjectWithRelations } from "./projects.types";
 
@@ -88,6 +89,12 @@ export class ProjectsService {
       args.push(priority);
     }
 
+    const scope = await projectScope("p.id");
+    if (scope.sql) {
+      conditions.push(scope.sql);
+      args.push(...scope.args);
+    }
+
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
     const sortColumn = SORTABLE_COLUMNS.has(sortBy) ? sortBy : "created_at";
     const direction = sortOrder === "asc" ? "ASC" : "DESC";
@@ -139,6 +146,7 @@ export class ProjectsService {
     );
 
     if (!project) throw new Error("Project not found.");
+    await assertProjectVisible(id);
 
     return {
       ...toBoolean(project),

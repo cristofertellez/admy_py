@@ -3,8 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { canAccessRoute } from "@/lib/routes";
 
-export function DashboardSidebar() {
+interface DashboardSidebarProps {
+  role?: string;
+}
+
+export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -79,21 +84,34 @@ export function DashboardSidebar() {
             <NavItem href="/dashboard/notifications" pathname={pathname}>
               Notifications
             </NavItem>
-            <NavItem href="/dashboard/users" pathname={pathname}>
-              Users
-            </NavItem>
-            <NavItem href="/dashboard/roles" pathname={pathname}>
-              Roles
-            </NavItem>
-            <NavItem href="/dashboard/activity" pathname={pathname}>
-              Activity
-            </NavItem>
+            {canAccessRoute("/dashboard/admin", role) && (
+              <NavItem href="/dashboard/admin" pathname={pathname}>
+                Admin Dashboard
+              </NavItem>
+            )}
+            {canAccessRoute("/dashboard/users", role) && (
+              <NavItem href="/dashboard/users" pathname={pathname}>
+                Users
+              </NavItem>
+            )}
+            {canAccessRoute("/dashboard/roles", role) && (
+              <NavItem href="/dashboard/roles" pathname={pathname}>
+                Roles
+              </NavItem>
+            )}
+            {canAccessRoute("/dashboard/activity", role) && (
+              <NavItem href="/dashboard/activity" pathname={pathname}>
+                Activity
+              </NavItem>
+            )}
             <NavItem href="/dashboard/tags" pathname={pathname}>
               Tags
             </NavItem>
-            <NavItem href="/dashboard/settings" pathname={pathname}>
-              Settings
-            </NavItem>
+            {canAccessRoute("/dashboard/settings", role) && (
+              <NavItem href="/dashboard/settings" pathname={pathname}>
+                Settings
+              </NavItem>
+            )}
             <div className="my-2 border-t border-hairline" />
             <NavItem href="/dashboard/profile" pathname={pathname}>
               Profile

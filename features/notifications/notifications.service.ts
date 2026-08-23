@@ -61,10 +61,10 @@ export class NotificationsService {
     );
   }
 
-  static async markAsRead(notificationId: string) {
+  static async markAsRead(notificationId: string, userId: string) {
     await query(
-      `UPDATE notifications SET is_read = 1 WHERE id = ?`,
-      [notificationId],
+      `UPDATE notifications SET is_read = 1 WHERE id = ? AND receiver_id = ?`,
+      [notificationId, userId],
     );
   }
 

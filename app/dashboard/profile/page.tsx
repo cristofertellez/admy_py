@@ -1,13 +1,16 @@
-"use client";
-
-import { updateProfile } from "@/actions/auth";
-import { Button } from "@/components/ui/button";
-import { FormField } from "@/components/forms/form-field";
+import { requireAuth } from "@/lib/auth";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
-import { useActionState } from "react";
+import { AvatarUpload } from "./avatar-upload";
+import { ChangePasswordForm } from "./change-password-form";
+import { PreferencesForm } from "./preferences-form";
+import { ProfileInfoForm } from "./profile-info-form";
 
-export default function ProfilePage() {
-  const [state, formAction, isPending] = useActionState(updateProfile, null);
+export const metadata = {
+  title: "Profile",
+};
+
+export default async function ProfilePage() {
+  const user = await requireAuth();
 
   return (
     <div className="max-w-lg space-y-6">
@@ -17,26 +20,46 @@ export default function ProfilePage() {
       </div>
 
       <Card>
+        <CardContent>
+          <AvatarUpload name={`${user.first_name} ${user.last_name}`.trim()} avatar={user.avatar} />
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader>
-          <CardTitle>Edit Profile</CardTitle>
+          <CardTitle>Profile Information</CardTitle>
         </CardHeader>
         <CardContent>
-          {state?.success && (
-            <p className="mb-4 rounded-md bg-success/10 px-4 py-3 text-body-sm text-success">
-              {state.success}
-            </p>
-          )}
-          <form action={formAction} className="flex flex-col gap-4">
-            <FormField label="First Name" name="first_name" placeholder="John" required />
-            <FormField label="Last Name" name="last_name" placeholder="Doe" required />
-            <FormField label="Phone" name="phone" type="tel" placeholder="+1 (555) 000-0000" />
-            {state?.error && (
-              <p className="text-body-sm text-error">{state.error}</p>
-            )}
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Saving..." : "Save Changes"}
-            </Button>
-          </form>
+          <ProfileInfoForm
+            firstName={user.first_name}
+            lastName={user.last_name}
+            email={user.email}
+            phone={user.phone}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Preferences</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PreferencesForm
+            initialPreferences={{
+              language: user.language ?? "en",
+              timezone: user.timezone ?? "UTC",
+              theme: user.theme ?? "dark",
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Password</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChangePasswordForm />
         </CardContent>
       </Card>
     </div>

@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/auth";
 import { IntermediariesService } from "@/features/intermediaries";
 import { IntermediariesTable } from "./intermediaries-table";
 import type { Metadata } from "next";
@@ -7,6 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function IntermediariesPage() {
+  await requirePermission("intermediaries.read");
   const { data } = await IntermediariesService.list({ pageSize: 50 });
 
   return (

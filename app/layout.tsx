@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { getUser } from "@/lib/auth";
 import "./globals.css";
 
 const inter = Inter({
@@ -49,13 +50,19 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getUser();
+
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang={user?.language ?? "en"}
+      data-theme={user?.theme ?? "dark"}
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
+    >
       <body className="min-h-screen bg-canvas text-body antialiased">
         <Providers>{children}</Providers>
         <ServiceWorkerRegister />

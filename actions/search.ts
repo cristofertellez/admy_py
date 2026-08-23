@@ -2,6 +2,7 @@
 
 import { query } from "@/lib/turso/client";
 import { getUser } from "@/lib/auth";
+import { clientScope, projectScope } from "@/lib/auth-scope";
 
 export interface SearchResult {
   id: string;
@@ -26,6 +27,13 @@ export async function globalSearch(
     const user = await getUser();
     if (!user) return { error: "Not authenticated." };
 
+    const [projectClause, taskClause, milestoneClause, clientClause] = await Promise.all([
+      projectScope("p.id"),
+      projectScope("t.project_id"),
+      projectScope("m.project_id"),
+      clientScope("id"),
+    ]);
+
     const pattern = `%${searchTerm.toLowerCase()}%`;
     const results: SearchResult[] = [];
 
@@ -36,8 +44,9 @@ export async function globalSearch(
          LEFT JOIN clients c ON c.id = p.client_id
          WHERE (lower(p.name) LIKE ? OR lower(p.description) LIKE ?)
            AND p.is_active = 1
+           AND ${projectClause.sql}
          LIMIT 5`,
-        [pattern, pattern],
+        [pattern, pattern, ...projectClause.args],
       ),
       query<Record<string, unknown>>(
         `SELECT t.id, t.title, t.status, t.priority, p.name AS project_name
@@ -45,17 +54,19 @@ export async function globalSearch(
          LEFT JOIN projects p ON p.id = t.project_id
          WHERE (lower(t.title) LIKE ? OR lower(t.description) LIKE ?)
            AND t.is_active = 1
+           AND ${taskClause.sql}
          LIMIT 5`,
-        [pattern, pattern],
+        [pattern, pattern, ...taskClause.args],
       ),
       query<Record<string, unknown>>(
-        `SELECT id, company_name, email, status
+        `SELECT id, company_name, email, phone, status
          FROM clients
-         WHERE (lower(company_name) LIKE ? OR lower(email) LIKE ? OR lower(contact_name) LIKE ?)
+         WHERE (lower(company_name) LIKE ? OR lower(email) LIKE ? OR lower(contact_name) LIKE ? OR lower(phone) LIKE ?)
            AND is_active = 1
            AND deleted_at IS NULL
+           AND ${clientClause.sql}
          LIMIT 5`,
-        [pattern, pattern, pattern],
+        [pattern, pattern, pattern, pattern, ...clientClause.args],
       ),
       query<Record<string, unknown>>(
         `SELECT m.id, m.title, m.status, p.name AS project_name, m.project_id
@@ -63,8 +74,9 @@ export async function globalSearch(
          LEFT JOIN projects p ON p.id = m.project_id
          WHERE (lower(m.title) LIKE ? OR lower(m.description) LIKE ?)
            AND m.is_active = 1
+           AND ${milestoneClause.sql}
          LIMIT 5`,
-        [pattern, pattern],
+        [pattern, pattern, ...milestoneClause.args],
       ),
     ]);
 
@@ -101,7 +113,7 @@ export async function globalSearch(
           id: c.id as string,
           type: "client",
           title: c.company_name as string,
-          subtitle: (c.email as string) || "Client",
+          subtitle: (c.email as string) || (c.phone as string) || "Client",
           url: `/dashboard/clients/${c.id}`,
           status: c.status as string,
         });

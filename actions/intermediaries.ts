@@ -1,9 +1,12 @@
 "use server";
 
 import { IntermediariesService } from "@/features/intermediaries";
+import { requirePermission } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 export async function createIntermediary(_prevState: unknown, formData: FormData) {
+  await requirePermission("intermediaries.create");
+
   const first_name = formData.get("first_name") as string;
   const last_name = formData.get("last_name") as string;
   const email = formData.get("email") as string;
@@ -22,6 +25,8 @@ export async function createIntermediary(_prevState: unknown, formData: FormData
 }
 
 export async function updateIntermediary(_prevState: unknown, formData: FormData) {
+  await requirePermission("intermediaries.update");
+
   const id = formData.get("id") as string;
   const first_name = formData.get("first_name") as string;
   const last_name = formData.get("last_name") as string;
@@ -41,6 +46,8 @@ export async function updateIntermediary(_prevState: unknown, formData: FormData
 }
 
 export async function toggleIntermediaryActive(id: string, isActive: boolean) {
+  await requirePermission("intermediaries.update");
+
   try {
     await IntermediariesService.toggleActive(id, isActive);
     revalidatePath("/dashboard/intermediaries");

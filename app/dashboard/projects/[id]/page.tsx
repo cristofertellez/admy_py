@@ -2,6 +2,8 @@ import { ProjectsService } from "@/features/projects";
 import { TasksService } from "@/features/tasks";
 import { MilestonesService } from "@/features/milestones";
 import { CommentsService } from "@/features/comments";
+import { isAccessDeniedError } from "@/lib/auth-scope";
+import { redirect } from "next/navigation";
 import { ProjectTabs } from "./project-tabs";
 import { Card, CardContent } from "@/components/shared/card";
 import { Badge } from "@/components/shared/badge";
@@ -12,13 +14,25 @@ interface Props { params: Promise<{ id: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const p = await ProjectsService.getById(id) as unknown as Record<string, unknown>;
-  return { title: p.name as string };
+  try {
+    const p = await ProjectsService.getById(id) as unknown as Record<string, unknown>;
+    return { title: p.name as string };
+  } catch {
+    return { title: "Project" };
+  }
 }
 
 export default async function ProjectDetailPage({ params }: Props) {
   const { id } = await params;
-  const project = await ProjectsService.getById(id) as unknown as Record<string, unknown>;
+
+  let project: Record<string, unknown>;
+  try {
+    project = await ProjectsService.getById(id) as unknown as Record<string, unknown>;
+  } catch (err) {
+    if (isAccessDeniedError(err)) redirect("/unauthorized");
+    throw err;
+  }
+
   const { data: tasks } = await TasksService.list({ projectId: id, pageSize: 100 });
   const milestones = await MilestonesService.listByProject(id);
   const comments = await CommentsService.listByProject(id);

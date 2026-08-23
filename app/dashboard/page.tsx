@@ -1,4 +1,4 @@
-import { getUser } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth";
 import { DashboardService } from "@/features/dashboard";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
 import { DashboardCharts } from "./dashboard-charts";
@@ -7,8 +7,8 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
-  const user = await getUser();
-  const stats = await DashboardService.getDeveloperStats();
+  const user = await requireAuth();
+  const stats = await DashboardService.getStats(user);
 
   const statCards = [
     { label: "Active Projects", value: stats.activeProjects, color: "text-primary" },
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-display-sm text-ink">Welcome, {user?.first_name}</h1>
+        <h1 className="text-display-sm text-ink">Welcome, {user.first_name}</h1>
         <p className="mt-1 text-body-sm text-muted">Here&apos;s what&apos;s happening with your projects.</p>
       </div>
 

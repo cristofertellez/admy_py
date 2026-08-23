@@ -143,7 +143,7 @@ Preparación para producción
 - [x] Landing page redirige usuarios autenticados a /dashboard
 - [x] Error boundaries: error.tsx, global-error.tsx, not-found.tsx
 - [x] next.config.ts configurado con headers de seguridad y PWA
-- [ ] Proxy/Middleware con protección de rutas y auth a nivel edge
+- [x] Proxy/Middleware con protección de rutas y auth a nivel edge
 - [x] Página Settings (/dashboard/settings) con formulario de configuración
 - [x] Módulo Tags: servicio, acciones y página de administración (/dashboard/tags)
 - [x] Módulo Time Entries: servicio y acciones creados
@@ -617,7 +617,7 @@ Implementar autorización independiente del proveedor de autenticación.
 - [x] Crear tabla Permisos
 - [x] Crear tabla Role Permissions
 - [x] Crear tabla User Roles (role_id en users)
-- [ ] Crear middleware de autorización
+- [x] Crear middleware de autorización
 - [x] Crear helper de permisos
 
 ### Frontend
@@ -756,14 +756,14 @@ Protección de rutas
 
 ## Backend
 
-- [ ] Middleware de autenticación
-- [ ] Middleware de autorización
-- [ ] Redirecciones automáticas
+- [x] Middleware de autenticación
+- [x] Middleware de autorización
+- [x] Redirecciones automáticas
 
 ## Frontend
 
-- [ ] Pantalla Acceso Denegado
-- [ ] Pantalla No Autenticado
+- [x] Pantalla Acceso Denegado
+- [x] Pantalla No Autenticado
 
 ### QA
 
@@ -792,19 +792,21 @@ Implementar reglas de seguridad en la capa de acceso a datos (servicios y reposi
 
 ### Tareas
 
-- [ ] Aplicar control de acceso en todas las consultas a tablas sensibles
-- [ ] Crear reglas de acceso para Developers
-- [ ] Crear reglas de acceso para Clients
-- [ ] Crear reglas de acceso para Intermediaries
-- [ ] Validar reglas de acceso
-- [ ] Probar intentos de acceso indebido
+- [x] Aplicar control de acceso en todas las consultas a tablas sensibles
+- [x] Crear reglas de acceso para Developers
+- [x] Crear reglas de acceso para Clients
+- [x] Crear reglas de acceso para Intermediaries
+- [x] Validar reglas de acceso
+- [x] Probar intentos de acceso indebido
 
 ### QA
 
-- [ ] Cliente solo ve sus datos
-- [ ] Intermediario solo ve clientes asignados
-- [ ] Developer ve toda la información
-- [ ] Validar intentos de acceso directo
+- [x] Cliente solo ve sus datos
+- [x] Intermediario solo ve clientes asignados
+- [x] Developer ve toda la información
+- [x] Validar intentos de acceso directo
+
+Implementación: `lib/auth-scope.ts` (scopes de proyectos/clientes/milestones/adjuntos + registro de accesos denegados en activity_logs), servicios por feature y guards `requirePermission` en server actions. QA en `docs/qa/historia-2.10-control-acceso-datos.md`.
 
 Estado
 
@@ -1121,14 +1123,14 @@ Perfil Administrativo
 ### Backend
 
 - [x] Consultar perfil
-- [ ] Actualizar información
-- [ ] Actualizar contraseña
+- [x] Actualizar información
+- [x] Actualizar contraseña
 
 ### Frontend
 
 - [x] Pantalla Perfil
-- [ ] Cambio de contraseña
-- [ ] Cambio de avatar
+- [x] Cambio de contraseña
+- [x] Cambio de avatar
 
 ### QA
 
@@ -1137,7 +1139,7 @@ Perfil Administrativo
 
 Estado
 
-Backlog
+Review
 
 Prioridad
 
@@ -1155,24 +1157,24 @@ Mostrar el historial de acciones realizadas por cada usuario.
 
 ### Backend
 
-- [ ] Consultar auditoría
+- [x] Consultar auditoría
 - [x] Filtrar actividades
 - [x] Ordenar eventos
 
 ### Frontend
 
-- [ ] Timeline
+- [x] Timeline
 - [x] DataTable
 - [x] Filtros
 
 ### QA
 
-- [ ] Verificar historial
-- [ ] Verificar filtros
+- [x] Verificar historial
+- [x] Verificar filtros
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1186,22 +1188,22 @@ Dashboard Administrativo
 
 ### Widgets
 
-- [ ] Usuarios activos
-- [ ] Usuarios inactivos
-- [ ] Roles existentes
-- [ ] Últimos accesos
+- [x] Usuarios activos
+- [x] Usuarios inactivos
+- [x] Roles existentes
+- [x] Últimos accesos
 - [x] Actividad reciente
-- [ ] Estadísticas generales
+- [x] Estadísticas generales
 
 ### QA
 
 - [ ] Información correcta
-- [ ] Actualización automática
-- [ ] Responsive
+- [x] Actualización automática
+- [x] Responsive
 
 Estado
 
-Backlog
+Testing
 
 Prioridad
 
@@ -1215,24 +1217,24 @@ Preferencias del Usuario
 
 ### Backend
 
-- [ ] Guardar preferencias
-- [ ] Obtener preferencias
+- [x] Guardar preferencias
+- [x] Obtener preferencias
 
 ### Frontend
 
-- [ ] Idioma (preparado)
-- [ ] Zona horaria
-- [ ] Tema (preparado)
-- [ ] Preferencias del Dashboard
+- [x] Idioma (preparado)
+- [x] Zona horaria
+- [x] Tema (preparado)
+- [ ] Preferencias del Dashboard (persistencia lista; UI depende de Historia 11.1)
 
 ### QA
 
-- [ ] Persistencia
-- [ ] Restauración automática
+- [x] Persistencia
+- [x] Restauración automática
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -1252,7 +1254,7 @@ Auditoría Administrativa
 - [x] Cambiar permisos
 - [x] Activar usuario
 - [x] Desactivar usuario
-- [ ] Cambiar contraseña
+- [x] Cambiar contraseña
 - [x] Actualizar perfil
 
 Estado
@@ -1312,19 +1314,19 @@ Permitir visualizar todos los clientes registrados.
 ### Backend
 
 - [x] Crear consulta paginada
-- [ ] Implementar búsqueda
+- [x] Implementar búsqueda
 - [x] Implementar filtros
 - [x] Ordenamiento
-- [ ] Paginación
+- [x] Paginación
 - [x] Consultar cantidad de proyectos
 - [x] Consultar estado general
 
 ### Frontend
 
 - [x] Crear DataTable reutilizable
-- [ ] Barra de búsqueda
+- [x] Barra de búsqueda
 - [x] Filtros avanzados
-- [ ] Acciones rápidas
+- [x] Acciones rápidas
 - [x] Indicadores visuales
 
 ### QA
@@ -1334,9 +1336,11 @@ Permitir visualizar todos los clientes registrados.
 - [ ] Validar paginación
 - [ ] Validar rendimiento
 
+Implementación: `/dashboard/clients` con estado en URL (search, status, page), búsqueda debounced server-side (company_name/contact_name/email), filtro de estado, paginación real con `ClientsService.list` (`total` + LIMIT/OFFSET), acciones rápidas View/Edit/Archive-Restore con confirmación y feedback accesible (aria-live). Build, TypeScript y ESLint verificados sin errores.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -1351,15 +1355,15 @@ Crear Cliente
 ## Backend
 
 - [x] Crear Server Action
-- [ ] Validar información
+- [x] Validar información
 - [x] Registrar cliente
-- [ ] Registrar auditoría
+- [x] Registrar auditoría
 
 ## Frontend
 
 - [x] Formulario
 - [x] Validaciones Zod
-- [ ] Confirmación de creación
+- [x] Confirmación de creación
 
 Campos iniciales
 
@@ -1374,12 +1378,14 @@ Campos iniciales
 ### QA
 
 - [x] Validar duplicados
-- [ ] Validar campos requeridos
-- [ ] Validar creación
+- [x] Validar campos requeridos
+- [x] Validar creación
+
+Implementación: esquema Zod compartido (`schemas/client.ts`) con validación cliente/servidor, guard `requirePermission("clients.create")`, auditoría en `activity_logs` (`created_client`), `created_by/updated_by` del actor y confirmación en el modal con actualización inmediata de la tabla. QA en `docs/qa/historia-4.2-crear-cliente.md`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1393,13 +1399,13 @@ Editar Cliente
 
 ### Backend
 
-- [ ] Actualizar información
-- [ ] Registrar auditoría
+- [x] Actualizar información
+- [x] Registrar auditoría
 
 ### Frontend
 
 - [x] Formulario de edición
-- [ ] Confirmación
+- [x] Confirmación
 
 ### QA
 
@@ -1424,7 +1430,7 @@ Archivar Cliente
 
 - [x] Cambio de estado
 - [x] Validar proyectos activos
-- [ ] Registrar auditoría
+- [x] Registrar auditoría
 
 ## Frontend
 
@@ -1433,13 +1439,15 @@ Archivar Cliente
 
 ### QA
 
-- [ ] Cliente archivado
-- [ ] Cliente restaurado
-- [ ] Restricciones funcionando
+- [x] Cliente archivado
+- [x] Cliente restaurado
+- [x] Restricciones funcionando
+
+Implementación: regla de negocio en `ClientsService.archive` (bloqueo si existen proyectos activos: `deleted_at IS NULL AND is_active = 1 AND status NOT IN ('Completed','Cancelled','Archived')`), auditoría en `activity_logs` (`archived_client`/`restored_client`) y acción con respuesta tipada `{ success | error }`. UI con confirmación previa al archivado, badge Active/Archived y feedback de éxito/error accesible (`aria-live`). QA en `docs/qa/historia-4.4-archivar-cliente.md`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1471,17 +1479,19 @@ Mostrar toda la información consolidada del cliente.
 
 - [x] Vista tipo Dashboard
 - [x] Tarjetas informativas
-- [ ] Timeline
-- [ ] Navegación por pestañas
+- [x] Timeline
+- [x] Navegación por pestañas
 
 ### QA
 
 - [ ] Información correcta
 - [ ] Responsive
 
+Implementación: `/dashboard/clients/[id]` reconstruida como vista dashboard con widgets (total/activos/finalizados/horas), pestañas Overview | Projects | Timeline (`client-tabs.tsx`), tarjeta de intermediario asignado, timeline de actividad del cliente reutilizando `ActivityTimeline` y métodos de servicio `getProjects`, `getAssignedIntermediary`, `getRecentActivity` con `assertClientVisible`. Las secciones Archivos y Comentarios se integran en las historias 4.8 y 4.9.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -1495,24 +1505,26 @@ Asignación de Intermediarios
 
 ## Backend
 
-- [ ] Asignar intermediario
-- [ ] Remover intermediario
+- [x] Asignar intermediario
+- [x] Remover intermediario
 - [x] Validar duplicados
-- [ ] Registrar auditoría
+- [x] Registrar auditoría
 
 ## Frontend
 
-- [ ] Selector múltiple
-- [ ] Lista de asignados
+- [x] Selector múltiple
+- [x] Lista de asignados
 
 ### QA
 
 - [ ] Asignación correcta
 - [ ] Eliminación correcta
 
+Implementación: `ClientsService.assignIntermediary` / `removeIntermediary` (valida visibilidad, rol Intermediary activo y duplicados) con acciones `assignClientIntermediary` / `removeClientIntermediary` protegidas por `clients.update`, auditoría en `activity_logs` (`assigned_intermediary`/`removed_intermediary`) y UI en la tarjeta "Assigned Intermediary" de `/dashboard/clients/[id]` (modal selector con confirmación y remover con confirmación; controles visibles solo con permiso vía `hasPermission`).
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1528,28 +1540,30 @@ Historial del Cliente
 
 Registrar automáticamente.
 
-- [ ] Creación
-- [ ] Edición
+- [x] Creación
+- [x] Edición
 - [x] Cambio de estado
-- [ ] Nuevos proyectos
-- [ ] Comentarios
-- [ ] Archivos
-- [ ] Asignaciones
+- [x] Nuevos proyectos
+- [x] Comentarios
+- [x] Archivos
+- [x] Asignaciones
 
 ## Frontend
 
-- [ ] Timeline cronológico
+- [x] Timeline cronológico
 - [x] Filtros
-- [ ] Búsqueda
+- [x] Búsqueda
 
 ### QA
 
 - [ ] Orden correcto
 - [ ] Eventos completos
 
+Implementación: `ClientsService.getClientHistory` agrega en una sola consulta los eventos `entity='Client'` más los eventos de proyectos del cliente (`created_project`) y de comentarios asociados (`created_comment` sobre comentarios de proyecto; comentarios de cliente vía Historia 4.9), con búsqueda server-side (acción, usuario y valores JSON) y filtro por categoría (cliente/proyectos/archivos/comentarios/intermediarios) mapeado a `CLIENT_HISTORY_ACTIONS`. UI: pestaña Timeline con estado en URL (`tab`, `q`, `category`, `page`), búsqueda debounced, selector de tipo de evento y paginación real reutilizando `ActivityTimeline` (`history-filters.tsx`). Orden cronológico descendente garantizado por `ORDER BY al.created_at DESC`.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1563,17 +1577,17 @@ Documentos del Cliente
 
 ## Backend
 
-- [ ] Subir archivo
-- [ ] Descargar archivo
-- [ ] Eliminar lógicamente
-- [ ] Registrar auditoría
+- [x] Subir archivo
+- [x] Descargar archivo
+- [x] Eliminar lógicamente
+- [x] Registrar auditoría
 
 ## Frontend
 
-- [ ] Lista de documentos
-- [ ] Drag & Drop
-- [ ] Vista previa
-- [ ] Descarga
+- [x] Lista de documentos
+- [x] Drag & Drop
+- [x] Vista previa
+- [x] Descarga
 
 ### QA
 
@@ -1581,9 +1595,11 @@ Documentos del Cliente
 - [x] Validar permisos
 - [ ] Validar eliminación
 
+Implementación: pestaña "Documents" en `/dashboard/clients/[id]` usando `attachments` (`entity_type='client'`) con `FilesService.list` + `attachmentScope`, subida con drag & drop (modal accesible, MIME/tamaño validados por `uploadFile`), descarga/vista previa vía URL firmada (`getFileUrl`), borrado lógico y auditoría `uploaded_file`/`deleted_file` añadida a `actions/files.ts` (con revalidación de la página del cliente). Botones gated por `files.upload` / `files.download` / `files.delete`.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1597,16 +1613,16 @@ Comentarios del Cliente
 
 ## Backend
 
-- [ ] Crear comentario
-- [ ] Editar comentario
-- [ ] Eliminar comentario
-- [ ] Registrar auditoría
+- [x] Crear comentario
+- [x] Editar comentario
+- [x] Eliminar comentario
+- [x] Registrar auditoría
 
 ## Frontend
 
-- [ ] Timeline
-- [ ] Editor
-- [ ] Respuestas
+- [x] Timeline
+- [x] Editor
+- [x] Respuestas
 - [ ] Menciones
 
 ### QA
@@ -1615,9 +1631,11 @@ Comentarios del Cliente
 - [ ] Editar
 - [ ] Eliminar
 
+Implementación: migración `00004_client_comments_sqlite.sql` (tabla espejo de project/task_comments con respuestas), métodos en `CommentsService` (`listByClient` con `clientScope`, `createClientComment`, `updateClientComment`, `deleteClientComment` con regla autor-o-permiso a nivel servidor), acciones `createClientCommentAction` / `updateClientCommentAction` / `deleteClientCommentAction` con auditoría (`created_client_comment`, `replied_client_comment`, `updated_client_comment`, `deleted_client_comment`) y pestaña "Comments" en `/dashboard/clients/[id]` (timeline agrupado por hilos, editor, respuestas anidadas, edición inline y borrado con confirmación). Menciones quedan pendientes para una iteración posterior.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1631,21 +1649,23 @@ Dashboard del Cliente
 
 ## Widgets
 
-- [ ] Total de proyectos
-- [ ] Proyectos activos
-- [ ] Proyectos finalizados
-- [ ] Horas registradas
-- [ ] Próximas entregas
-- [ ] Última actividad
+- [x] Total de proyectos
+- [x] Proyectos activos
+- [x] Proyectos finalizados
+- [x] Horas registradas
+- [x] Próximas entregas
+- [x] Última actividad
 
 ### QA
 
 - [ ] Información correcta
 - [ ] Actualización automática
 
+Implementación: cabecera dashboard de `/dashboard/clients/[id]` con tarjetas Total/Active/Completed Projects y Worked Hours (agregadas desde `ClientsService.getProjects`), fila de widgets "Upcoming Deliveries" (próximos hitos no completados vía `getUpcomingDeliveries`) y "Last Activity" (último evento de `activity_logs` del cliente o sus proyectos vía `getLastActivity`). La actualización automática se cubre con `revalidatePath` en todas las server actions que mutan datos del cliente (archivos, comentarios, asignación, estado).
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1659,15 +1679,15 @@ Búsqueda Global de Clientes
 
 ## Backend
 
-- [ ] Buscar por nombre
-- [ ] Buscar por empresa
-- [ ] Buscar por correo
-- [ ] Buscar por teléfono
+- [x] Buscar por nombre
+- [x] Buscar por empresa
+- [x] Buscar por correo
+- [x] Buscar por teléfono
 
 ## Frontend
 
-- [ ] Búsqueda instantánea
-- [ ] Resultados rápidos
+- [x] Búsqueda instantánea
+- [x] Resultados rápidos
 
 ### QA
 
@@ -1676,7 +1696,7 @@ Búsqueda Global de Clientes
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1690,18 +1710,20 @@ Auditoría del Cliente
 
 Registrar.
 
-- [ ] Creación
-- [ ] Actualización
-- [ ] Archivado
-- [ ] Restauración
-- [ ] Asignación de intermediarios
-- [ ] Subida de archivos
-- [ ] Comentarios
-- [ ] Creación de proyectos
+- [x] Creación
+- [x] Actualización
+- [x] Archivado
+- [x] Restauración
+- [x] Asignación de intermediarios
+- [x] Subida de archivos
+- [x] Comentarios
+- [x] Creación de proyectos
+
+Implementación: eventos en `activity_logs` desde la capa de acciones — `created_client`/`updated_client` (con diff old/new por campo), `archived_client`/`restored_client`, `assigned_intermediary`/`removed_intermediary`, `uploaded_file`/`deleted_file` (entidad normalizada a mayúscula inicial: "Client", "Project", etc., para que el historial del cliente los resuelva), `created_project` con referencia al cliente, y comentarios (`created_comment` para proyectos; `created_client_comment`/`replied_client_comment`/`updated_client_comment`/`deleted_client_comment` vía Historia 4.9). Escritura centralizada en `ActivityService.log`; los fallos de auditoría no bloquean la operación principal.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 

@@ -1,4 +1,12 @@
-import { assertProjectVisible, assertTaskVisible, projectScope, requireScopedUser } from "@/lib/auth-scope";
+import { hasPermission } from "@/lib/auth";
+import {
+  assertClientVisible,
+  assertProjectVisible,
+  assertTaskVisible,
+  clientScope,
+  projectScope,
+  requireScopedUser,
+} from "@/lib/auth-scope";
 import { newId, query, queryOne } from "@/lib/turso/client";
 import type { Comment } from "@/types";
 
@@ -137,5 +145,99 @@ export class CommentsService {
       now,
       id,
     ]);
+  }
+
+  // ============================================================
+  // Client comments (Historia 4.9)
+  // ============================================================
+
+  static async listByClient(clientId: string): Promise<CommentWithAuthor[]> {
+    await assertClientVisible(clientId);
+
+    const scope = await clientScope("c.id");
+    const rows = await query<Comment & CommentAuthorColumns>(
+      `SELECT cc.*, u.first_name AS author_first_name, u.last_name AS author_last_name, u.avatar AS author_avatar
+       FROM client_comments cc
+       JOIN clients c ON c.id = cc.client_id
+       LEFT JOIN users u ON u.id = cc.user_id
+       WHERE cc.client_id = ? AND cc.deleted_at IS NULL AND cc.is_active = 1${scope.sql ? ` AND ${scope.sql}` : ""}
+       ORDER BY cc.created_at ASC`,
+      [clientId, ...scope.args],
+    );
+
+    return rows.map((row) => mapCommentWithAuthor(row));
+  }
+
+  static async createClientComment(input: {
+    client_id: string;
+    user_id: string;
+    message: string;
+    parent_comment_id?: string;
+  }): Promise<Comment> {
+    await assertClientVisible(input.client_id);
+
+    if (input.parent_comment_id) {
+      const parent = await queryOne<{ client_id: string }>(
+        `SELECT client_id FROM client_comments WHERE id = ? AND deleted_at IS NULL AND is_active = 1 LIMIT 1`,
+        [input.parent_comment_id],
+      );
+      if (!parent || parent.client_id !== input.client_id) {
+        throw new Error("Parent comment not found.");
+      }
+    }
+
+    const id = newId();
+    await query(
+      `INSERT INTO client_comments (id, client_id, user_id, parent_comment_id, message)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id, input.client_id, input.user_id, input.parent_comment_id ?? null, input.message],
+    );
+
+    const row = await queryOne<Comment>("SELECT * FROM client_comments WHERE id = ?", [id]);
+    return this.mapComment(row!);
+  }
+
+  static async updateClientComment(id: string, message: string) {
+    const user = await requireScopedUser();
+    const comment = await queryOne<{ user_id: string }>(
+      "SELECT user_id FROM client_comments WHERE id = ? AND deleted_at IS NULL AND is_active = 1",
+      [id],
+    );
+    if (!comment) throw new Error("Comment not found.");
+
+    const canModerate =
+      user.role === "Developer" ||
+      (hasPermission(user, "comments.update"));
+    if (!canModerate && comment.user_id !== user.id) {
+      throw new Error("You can only edit your own comments.");
+    }
+
+    const now = new Date().toISOString();
+    await query(
+      "UPDATE client_comments SET message = ?, is_edited = 1, edited_at = ?, updated_at = ? WHERE id = ?",
+      [message, now, now, id],
+    );
+  }
+
+  static async deleteClientComment(id: string) {
+    const user = await requireScopedUser();
+    const comment = await queryOne<{ user_id: string }>(
+      "SELECT user_id FROM client_comments WHERE id = ? AND deleted_at IS NULL AND is_active = 1",
+      [id],
+    );
+    if (!comment) throw new Error("Comment not found.");
+
+    const canModerate =
+      user.role === "Developer" ||
+      (hasPermission(user, "comments.delete"));
+    if (!canModerate && comment.user_id !== user.id) {
+      throw new Error("You can only delete your own comments.");
+    }
+
+    const now = new Date().toISOString();
+    await query(
+      "UPDATE client_comments SET is_active = 0, deleted_at = ?, updated_at = ? WHERE id = ?",
+      [now, now, id],
+    );
   }
 }

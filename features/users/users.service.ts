@@ -157,6 +157,41 @@ export class UsersService {
     return toUserWithRole(row);
   }
 
+  static async updateProfile(
+    id: string,
+    input: { first_name: string; last_name: string; phone: string | null },
+  ) {
+    await query(
+      `UPDATE users
+       SET first_name = ?, last_name = ?, phone = ?, updated_at = ?
+       WHERE id = ?`,
+      [input.first_name, input.last_name, input.phone, new Date().toISOString(), id],
+    );
+  }
+
+  static async getPasswordHash(id: string): Promise<string | null> {
+    const row = await queryOne<{ password_hash: string }>(
+      "SELECT password_hash FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1",
+      [id],
+    );
+    return row?.password_hash ?? null;
+  }
+
+  static async updatePassword(id: string, passwordHash: string) {
+    await query(
+      "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+      [passwordHash, new Date().toISOString(), id],
+    );
+  }
+
+  static async updateAvatar(id: string, avatar: string | null) {
+    await query("UPDATE users SET avatar = ?, updated_at = ? WHERE id = ?", [
+      avatar,
+      new Date().toISOString(),
+      id,
+    ]);
+  }
+
   static async toggleActive(id: string, isActive: boolean) {
     await query(
       `UPDATE users

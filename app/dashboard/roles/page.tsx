@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/auth";
 import { UsersService } from "@/features/users";
 import { RolesTable } from "./roles-table";
 import type { Metadata } from "next";
@@ -7,6 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RolesPage() {
+  await requirePermission("users.read");
   const roles = await UsersService.getRoles();
   const permissions = await UsersService.getPermissions();
 

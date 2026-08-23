@@ -1,44 +1,39 @@
-import { ActivityTable } from "./activity-table";
+import { requirePermission } from "@/lib/auth";
+import { ActivityLogService } from "@/features/activity";
+import { ActivityView } from "./activity-view";
 import type { Metadata } from "next";
-import { query } from "@/lib/turso/client";
-
-interface ActivityLogDbRow {
-  id: string;
-  user_id: string | null;
-  action: string;
-  entity: string;
-  entity_id: string | null;
-  old_value: string | null;
-  new_value: string | null;
-  ip_address: string | null;
-  user_agent: string | null;
-  created_at: string;
-  user_first_name: string | null;
-  user_last_name: string | null;
-}
 
 export const metadata: Metadata = {
   title: "Activity",
 };
 
-export default async function ActivityPage() {
-  const logs = await query<ActivityLogDbRow>(
-    `SELECT al.*, u.first_name AS user_first_name, u.last_name AS user_last_name
-     FROM activity_logs al
-     LEFT JOIN users u ON u.id = al.user_id
-     ORDER BY al.created_at DESC
-     LIMIT 100`,
-  );
+const PAGE_SIZE = 20;
 
-  const rows: Record<string, unknown>[] = logs.map(
-    ({ user_first_name, user_last_name, ...log }) => ({
-      ...log,
-      users:
-        user_first_name !== null && user_last_name !== null
-          ? { first_name: user_first_name, last_name: user_last_name }
-          : null,
-    }),
-  );
+interface ActivityPageProps {
+  searchParams: Promise<{
+    search?: string;
+    user?: string;
+    entity?: string;
+    view?: string;
+    page?: string;
+  }>;
+}
+
+export default async function ActivityPage({ searchParams }: ActivityPageProps) {
+  await requirePermission("users.read");
+  const params = await searchParams;
+
+  const search = params.search?.trim() || undefined;
+  const userId = params.user || undefined;
+  const entity = params.entity || undefined;
+  const view = params.view === "timeline" ? "timeline" : "table";
+  const page = Math.max(1, Number.parseInt(params.page || "1", 10) || 1);
+
+  const [{ data: logs, total }, users, entities] = await Promise.all([
+    ActivityLogService.list({ search, userId, entity, page, pageSize: PAGE_SIZE }),
+    ActivityLogService.getUsersWithActivity(),
+    ActivityLogService.getEntities(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -46,7 +41,16 @@ export default async function ActivityPage() {
         <h1 className="text-display-sm text-ink">Activity Log</h1>
         <p className="mt-1 text-body-sm text-muted">Recent actions across the platform.</p>
       </div>
-      <ActivityTable logs={rows} />
+      <ActivityView
+        logs={logs}
+        total={total}
+        users={users}
+        entities={entities}
+        initialFilters={{ search: search ?? "", user: userId ?? "", entity: entity ?? "" }}
+        view={view}
+        pageIndex={page - 1}
+        pageSize={PAGE_SIZE}
+      />
     </div>
   );
 }

@@ -5,9 +5,9 @@ import { requirePermission } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 export async function createMilestone(_prevState: unknown, formData: FormData) {
-  try {
-    await requirePermission("projects.update");
+  await requirePermission("projects.update");
 
+  try {
     await query(
       `INSERT INTO milestones (id, project_id, title, description, estimated_date, status, sort_order)
        VALUES (?, ?, ?, ?, ?, 'Pending', ?)`,
@@ -30,11 +30,11 @@ export async function createMilestone(_prevState: unknown, formData: FormData) {
 }
 
 export async function updateMilestone(_prevState: unknown, formData: FormData) {
+  await requirePermission("projects.update");
+
+  const id = formData.get("id") as string;
+
   try {
-    await requirePermission("projects.update");
-
-    const id = formData.get("id") as string;
-
     await query(
       `UPDATE milestones
        SET title = ?, description = ?, estimated_date = ?, status = ?, completion_percentage = ?, updated_at = ?

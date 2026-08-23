@@ -1,13 +1,15 @@
 "use server";
 
 import { UsersService } from "@/features/users";
-import { getUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { queryOne } from "@/lib/turso/client";
 import { ActivityService } from "@/services/activity.service";
 import { createUserSchema, updateUserSchema } from "@/schemas";
 import { revalidatePath } from "next/cache";
 
 export async function createUser(_prevState: unknown, formData: FormData) {
+  const actor = await requirePermission("users.create");
+
   const parsed = createUserSchema.safeParse({
     first_name: formData.get("first_name"),
     last_name: formData.get("last_name"),
@@ -23,8 +25,6 @@ export async function createUser(_prevState: unknown, formData: FormData) {
 
   try {
     const created = await UsersService.create(parsed.data);
-
-    const actor = await getUser();
 
     if (actor) {
       await ActivityService.log({
@@ -62,7 +62,7 @@ export async function updateUser(_prevState: unknown, formData: FormData) {
   }
 
   try {
-    const actor = await getUser();
+    const actor = await requirePermission("users.update");
 
     const oldUser = await queryOne<{
       first_name: string;
@@ -125,10 +125,10 @@ export async function updateUser(_prevState: unknown, formData: FormData) {
 }
 
 export async function toggleUserActive(id: string, isActive: boolean) {
+  const actor = await requirePermission("users.update");
+
   try {
     await UsersService.toggleActive(id, isActive);
-
-    const actor = await getUser();
 
     if (actor) {
       await ActivityService.log({

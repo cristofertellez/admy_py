@@ -1,4 +1,9 @@
 import { countRows, query, queryOne } from "@/lib/turso/client";
+import {
+  assertEntityVisible,
+  assertProjectVisible,
+  requireScopedUser,
+} from "@/lib/auth-scope";
 
 interface ActivityLogDbRow {
   id: string;
@@ -17,6 +22,8 @@ interface ActivityLogDbRow {
 
 export class ReportsService {
   static async getProjectReport(projectId: string) {
+    await assertProjectVisible(projectId);
+
     const [project, totalTasks, completedTasks] = await Promise.all([
       queryOne<Record<string, unknown>>(
         `SELECT * FROM projects WHERE id = ? LIMIT 1`,
@@ -38,6 +45,9 @@ export class ReportsService {
   }
 
   static async getActivityLogs(entity: string, entityId: string, limit = 20) {
+    const actor = await requireScopedUser();
+    await assertEntityVisible(entity.toLowerCase(), entityId, actor);
+
     const rows = await query<ActivityLogDbRow>(
       `SELECT al.*, u.first_name AS user_first_name, u.last_name AS user_last_name
        FROM activity_logs al

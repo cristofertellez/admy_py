@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { TimeEntriesService } from "@/features/time-entries";
 
 export async function getTimeEntries(taskId: string) {
@@ -9,8 +9,7 @@ export async function getTimeEntries(taskId: string) {
 }
 
 export async function createTimeEntry(formData: FormData) {
-  const user = await getUser();
-  if (!user) throw new Error("Not authenticated");
+  const user = await requirePermission("time-entries.create");
 
   const taskId = formData.get("task_id") as string;
   const date = formData.get("date") as string;
@@ -34,6 +33,8 @@ export async function createTimeEntry(formData: FormData) {
 }
 
 export async function deleteTimeEntry(formData: FormData) {
+  await requirePermission("time-entries.delete");
+
   const id = formData.get("id") as string;
   try {
     const result = await TimeEntriesService.remove(id);

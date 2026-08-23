@@ -1,13 +1,13 @@
 "use server";
 
 import { ReportsService } from "@/features/reports";
-import { getUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { countRows } from "@/lib/turso/client";
 
 export async function getProjectReport(projectId: string) {
+  await requirePermission("reports.view");
+
   try {
-    const user = await getUser();
-    if (!user) return { error: "Unauthenticated." };
     return await ReportsService.getProjectReport(projectId);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to load report." };
@@ -16,8 +16,11 @@ export async function getProjectReport(projectId: string) {
 
 export async function getGlobalReport() {
   try {
-    const user = await getUser();
-    if (!user) return { error: "Unauthenticated." };
+    const user = await requirePermission("reports.view");
+
+    if (user.role !== "Developer") {
+      return { error: "You do not have access to global reports." };
+    }
 
     const [
       totalProjects,

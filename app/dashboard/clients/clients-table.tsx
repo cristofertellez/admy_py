@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { FormField, FormTextarea } from "@/components/forms";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
 import { createClient, updateClient, toggleClientActive } from "@/actions/clients";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Client } from "@/types";
+import type { ClientWithRelations } from "@/features/clients/clients.types";
 import Link from "next/link";
 
-const columns: ColumnDef<Client>[] = [
+const columns: ColumnDef<ClientWithRelations>[] = [
   {
     accessorKey: "company_name",
     header: "Company",
@@ -39,25 +41,66 @@ const columns: ColumnDef<Client>[] = [
 ];
 
 interface ClientsTableProps {
-  initialClients: Client[];
+  initialClients: ClientWithRelations[];
+  total: number;
+  initialFilters: { search: string; status: string };
+  pageIndex: number;
+  pageSize: number;
 }
 
-export function ClientsTable({ initialClients }: ClientsTableProps) {
-  const [clients, setClients] = useState(initialClients);
-  const [showCreate, setShowCreate] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [, startTransition] = useTransition();
+export function ClientsTable({
+  initialClients,
+  total,
+  initialFilters,
+  pageIndex,
+  pageSize,
+}: ClientsTableProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  function handleToggle(id: string, current: boolean) {
-    startTransition(async () => {
-      await toggleClientActive(id, !current);
-      setClients((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, is_active: !current, status: current ? "inactive" : "active" } : c)),
-      );
+  const [showCreate, setShowCreate] = useState(false);
+  const [editingClient, setEditingClient] = useState<ClientWithRelations | null>(null);
+  const [searchInput, setSearchInput] = useState(initialFilters.search);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [, startTransition] = useTransition();
+  const debouncedSearch = useDebounce(searchInput, 400);
+
+  function navigate(overrides: Record<string, string | undefined>) {
+    const next = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    const qs = next.toString();
+    startTransition(() => {
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
     });
   }
 
-  const actionColumns: ColumnDef<Client>[] = [
+  useEffect(() => {
+    if (debouncedSearch === initialFilters.search) return;
+    navigate({ search: debouncedSearch || undefined, page: undefined });
+  }, [debouncedSearch]);
+
+  function handleToggle(client: ClientWithRelations) {
+    const archiving = client.is_active;
+    if (archiving && !window.confirm(`Archive client "${client.company_name}"? You can restore it later.`)) {
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await toggleClientActive(client.id, !archiving);
+      if (result?.error) {
+        setFeedback({ type: "error", message: result.error });
+        return;
+      }
+      setFeedback({ type: "success", message: result.success ?? "" });
+      router.refresh();
+    });
+  }
+
+  const actionColumns: ColumnDef<ClientWithRelations>[] = [
     ...columns,
     {
       id: "actions",
@@ -77,7 +120,7 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
             Edit
           </button>
           <button
-            onClick={() => handleToggle(row.original.id, row.original.is_active)}
+            onClick={() => handleToggle(row.original)}
             className="text-body-sm text-muted hover:text-body-strong"
           >
             {row.original.is_active ? "Archive" : "Restore"}
@@ -89,21 +132,61 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      {feedback && (
+        <p
+          role="status"
+          aria-live="polite"
+          className={feedback.type === "error" ? "text-body-sm text-error" : "text-body-sm text-success"}
+        >
+          {feedback.message}
+        </p>
+      )}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:w-40">
+          <label
+            htmlFor="clients-status-filter"
+            className="mb-1.5 block text-body-sm font-medium text-body-strong"
+          >
+            Status
+          </label>
+          <select
+            id="clients-status-filter"
+            value={initialFilters.status}
+            onChange={(e) => navigate({ status: e.target.value || undefined, page: undefined })}
+            className="h-10 w-full rounded-md border border-hairline bg-surface-card px-3 py-2 text-body-sm text-body-strong focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          >
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
         <Button onClick={() => setShowCreate(true)}>Add Client</Button>
       </div>
 
-      <DataTable columns={actionColumns} data={clients} searchColumn="company_name" />
+      <DataTable
+        columns={actionColumns}
+        data={initialClients}
+        totalCount={total}
+        searchColumn="company_name"
+        searchPlaceholder="Search by company, contact, email or phone..."
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onPaginationChange={(pagination) =>
+          navigate({ page: pagination.pageIndex === 0 ? undefined : String(pagination.pageIndex + 1) })
+        }
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+      />
 
       {showCreate && (
-        <ClientFormModal onClose={() => setShowCreate(false)} onSuccess={() => setShowCreate(false)} />
+        <ClientFormModal onClose={() => setShowCreate(false)} onSuccess={() => { setShowCreate(false); router.refresh(); }} />
       )}
 
       {editingClient && (
         <ClientFormModal
           client={editingClient}
           onClose={() => setEditingClient(null)}
-          onSuccess={() => setEditingClient(null)}
+          onSuccess={() => { setEditingClient(null); router.refresh(); }}
         />
       )}
     </div>
@@ -115,7 +198,7 @@ function ClientFormModal({
   onClose,
   onSuccess,
 }: {
-  client?: Client;
+  client?: ClientWithRelations;
   onClose: () => void;
   onSuccess: () => void;
 }) {

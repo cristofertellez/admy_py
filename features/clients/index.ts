@@ -1,2 +1,14 @@
 export { ClientsService } from "./clients.service";
-export type { ClientWithRelations } from "./clients.types";
+export {
+  CLIENT_HISTORY_ACTIONS,
+  isClientHistoryCategory,
+} from "./clients.types";
+export type {
+  AssignedIntermediary,
+  ClientDetailData,
+  ClientHistoryCategory,
+  ClientHistoryFilters,
+  ClientHistoryResult,
+  ClientProjectSummary,
+  ClientWithRelations,
+} from "./clients.types";

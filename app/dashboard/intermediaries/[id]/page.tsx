@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/auth";
 import { IntermediariesService } from "@/features/intermediaries";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
 import { Badge } from "@/components/shared/badge";
@@ -8,12 +9,14 @@ interface Props { params: Promise<{ id: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
+  await requirePermission("intermediaries.read");
   const data = await IntermediariesService.getById(id) as Record<string, unknown>;
   return { title: `${data.first_name} ${data.last_name}` };
 }
 
 export default async function IntermediaryDetailPage({ params }: Props) {
   const { id } = await params;
+  await requirePermission("intermediaries.read");
   const intermediary = await IntermediariesService.getById(id) as Record<string, unknown>;
   const clients = await IntermediariesService.getAssignedClients(id);
 

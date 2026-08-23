@@ -2,6 +2,8 @@ import { TasksService } from "@/features/tasks";
 import { CommentsService } from "@/features/comments";
 import { ChecklistsService } from "@/features/checklists";
 import { getUser } from "@/lib/auth";
+import { isAccessDeniedError } from "@/lib/auth-scope";
+import { redirect } from "next/navigation";
 import { TaskDetail } from "./task-detail";
 import { Card, CardContent } from "@/components/shared/card";
 import { Badge } from "@/components/shared/badge";
@@ -27,7 +29,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TaskDetailPage({ params }: Props) {
   const { id } = await params;
   const user = await getUser();
-  const taskWithSubtasks = await TasksService.getWithSubtasks(id) as unknown as Record<string, unknown>;
+
+  let taskWithSubtasks: Record<string, unknown>;
+  try {
+    taskWithSubtasks = await TasksService.getWithSubtasks(id) as unknown as Record<string, unknown>;
+  } catch (err) {
+    if (isAccessDeniedError(err)) redirect("/unauthorized");
+    throw err;
+  }
+
   const subtasks = (taskWithSubtasks.subtasks as { id: string; title: string; status: string; priority: string; completion_percentage: number; estimated_hours: number }[]) || [];
   const dependencies = (taskWithSubtasks.dependencies as { id: string; depends_on: { id: string; title: string; status: string } }[]) || [];
   const task = taskWithSubtasks as Record<string, unknown>;

@@ -1,4 +1,5 @@
-export { login, signup, logout, forgotPassword, resetPassword, updateProfile } from "./auth";
+export { login, signup, logout, forgotPassword, resetPassword } from "./auth";
+export { updateProfile, changePassword, uploadAvatar } from "./profile";
 export * from "@/features/projects";
 export * from "@/features/tasks";
 export * from "@/features/clients";

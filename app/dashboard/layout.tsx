@@ -13,12 +13,12 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  await requireAuth();
+  const user = await requireAuth();
 
   return (
     <div>
       <Header>
-        <DashboardSidebar />
+        <DashboardSidebar role={user.role} />
         <ConnectivityIndicator />
         <DashboardHeaderActions />
       </Header>

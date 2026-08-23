@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { ChecklistsService } from "@/features/checklists";
-import { getUser } from "@/lib/auth";
+import { getUser, requirePermission } from "@/lib/auth";
 
 export async function createChecklistItem(
   _prevState: unknown,
   formData: FormData
 ): Promise<{ success?: string; error?: string }> {
+  await requirePermission("tasks.create");
+
   try {
     const user = await getUser();
     const taskId = formData.get("task_id") as string;
@@ -34,6 +36,8 @@ export async function toggleChecklistItem(
   _prevState: unknown,
   formData: FormData
 ): Promise<{ success?: string; error?: string }> {
+  await requirePermission("tasks.update");
+
   try {
     const id = formData.get("id") as string;
     const taskId = formData.get("task_id") as string;
@@ -55,6 +59,8 @@ export async function deleteChecklistItem(
   _prevState: unknown,
   formData: FormData
 ): Promise<{ success?: string; error?: string }> {
+  await requirePermission("tasks.update");
+
   try {
     const id = formData.get("id") as string;
     const taskId = formData.get("task_id") as string;

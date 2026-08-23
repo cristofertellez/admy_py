@@ -1,4 +1,5 @@
 import { countRows, query, queryOne, type InValue } from "@/lib/turso/client";
+import { assertEntityVisible, attachmentScope } from "@/lib/auth-scope";
 import { deleteFromR2, getSignedDownloadUrl, isBucket } from "@/lib/storage/r2";
 
 interface AttachmentDbRow {
@@ -56,6 +57,12 @@ export class FilesService {
       args.push(entityId);
     }
 
+    const scope = await attachmentScope("a.entity_type", "a.entity_id");
+    if (scope.sql) {
+      conditions.push(scope.sql);
+      args.push(...scope.args);
+    }
+
     const whereSql = conditions.join(" AND ");
 
     const total = await countRows(
@@ -86,7 +93,9 @@ export class FilesService {
       [id],
     );
 
-    return row ? withUploader(row) : null;
+    if (!row) return null;
+    await assertEntityVisible(row.entity_type, row.entity_id);
+    return withUploader(row);
   }
 
   static async getSignedUrl(bucket: string, storagePath: string) {
@@ -96,13 +105,27 @@ export class FilesService {
     return getSignedDownloadUrl(bucket, storagePath, 300);
   }
 
-  static async delete(id: string) {
-    const file = await queryOne<{ bucket: string; storage_path: string }>(
-      `SELECT bucket, storage_path FROM attachments WHERE id = ? LIMIT 1`,
+  static async delete(id: string): Promise<{
+    filename: string;
+    entity_type: string;
+    entity_id: string;
+  } | null> {
+    const file = await queryOne<{
+      bucket: string;
+      storage_path: string;
+      filename: string;
+      entity_type: string;
+      entity_id: string;
+    }>(
+      `SELECT bucket, storage_path, filename, entity_type, entity_id FROM attachments WHERE id = ? LIMIT 1`,
       [id],
     );
 
-    if (file && isBucket(file.bucket)) {
+    if (!file) return null;
+
+    await assertEntityVisible(file.entity_type, file.entity_id);
+
+    if (isBucket(file.bucket)) {
       try {
         await deleteFromR2(file.bucket, file.storage_path);
       } catch {
@@ -115,5 +138,7 @@ export class FilesService {
       `UPDATE attachments SET is_active = 0, deleted_at = ?, updated_at = ? WHERE id = ?`,
       [now, now, id],
     );
+
+    return { filename: file.filename, entity_type: file.entity_type, entity_id: file.entity_id };
   }
 }

@@ -1,12 +1,14 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/auth.config";
 import { NextResponse } from "next/server";
+import { canAccessRoute } from "@/lib/routes";
 
 const { auth } = NextAuth(authConfig);
 
 export const proxy = auth((req) => {
   const { pathname } = req.nextUrl;
   const user = req.auth;
+  const role = user?.user?.role;
 
   const isAuthPage =
     pathname.startsWith("/login") ||
@@ -15,6 +17,7 @@ export const proxy = auth((req) => {
 
   const isDashboard = pathname.startsWith("/dashboard");
   const isApi = pathname.startsWith("/api");
+  const isAuthApi = pathname.startsWith("/api/auth");
 
   if (!user && isDashboard) {
     const loginUrl = new URL("/login", req.url);
@@ -26,8 +29,15 @@ export const proxy = auth((req) => {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  if (!user && isApi) {
+  if (!user && isApi && !isAuthApi) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (user && !canAccessRoute(pathname, role)) {
+    if (isApi) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
   return NextResponse.next();

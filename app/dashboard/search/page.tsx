@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Badge } from "@/components/shared/badge";
 import { Card } from "@/components/shared/card";
 import { Input } from "@/components/forms/input";
@@ -28,26 +28,39 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const latestTermRef = useRef("");
 
   const debouncedQuery = useDebounce(query, 300);
 
-  function handleSearch(q: string) {
-    setQuery(q);
-    if (q.trim().length < 2) {
+  useEffect(() => {
+    const term = debouncedQuery.trim();
+    if (term.length < 2) {
+      latestTermRef.current = "";
       setResults([]);
       setHasSearched(false);
+      setError(null);
       return;
     }
+
+    latestTermRef.current = term;
     setHasSearched(true);
     startTransition(async () => {
       const formData = new FormData();
-      formData.set("query", q);
+      formData.set("query", term);
       const { globalSearch } = await import("@/actions/search");
       const res = await globalSearch(null, formData);
+      if (latestTermRef.current !== term) return;
+      if (res.error) {
+        setError(res.error);
+        setResults([]);
+        return;
+      }
+      setError(null);
       if (res.results) setResults(res.results);
     });
-  }
+  }, [debouncedQuery]);
 
   return (
     <div className="space-y-6">
@@ -70,7 +83,7 @@ export default function SearchPage() {
         </svg>
         <Input
           value={query}
-          onChange={(e) => handleSearch(e.target.value)}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Search projects, tasks, clients..."
           className="pl-10 h-12 text-body-md"
         />
@@ -80,7 +93,13 @@ export default function SearchPage() {
         <p className="text-body-sm text-muted">Searching...</p>
       )}
 
-      {!isPending && hasSearched && results.length === 0 && (
+      {!isPending && error && (
+        <p role="alert" className="text-body-sm text-error">
+          {error}
+        </p>
+      )}
+
+      {!isPending && !error && hasSearched && results.length === 0 && (
         <div className="py-12 text-center">
           <p className="text-body-sm text-muted-soft">
             No results found for &quot;{debouncedQuery}&quot;.

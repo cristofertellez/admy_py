@@ -1,9 +1,12 @@
 "use server";
 
 import { TasksService } from "@/features/tasks";
+import { requirePermission } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 export async function createTask(_prevState: unknown, formData: FormData) {
+  await requirePermission("tasks.create");
+
   try {
     await TasksService.create({
       project_id: formData.get("project_id") as string,
@@ -28,6 +31,8 @@ export async function createTask(_prevState: unknown, formData: FormData) {
 }
 
 export async function updateTask(_prevState: unknown, formData: FormData) {
+  await requirePermission("tasks.update");
+
   const id = formData.get("id") as string;
   if (!id) return { error: "Missing task ID." };
   try {
@@ -55,6 +60,8 @@ export async function updateTask(_prevState: unknown, formData: FormData) {
 }
 
 export async function createSubtask(_prevState: unknown, formData: FormData) {
+  await requirePermission("tasks.create");
+
   try {
     const parentTaskId = formData.get("parent_task_id") as string;
     if (!parentTaskId) return { error: "Parent task ID is required." };
@@ -81,6 +88,8 @@ export async function createSubtask(_prevState: unknown, formData: FormData) {
 }
 
 export async function toggleTaskCompletion(_prevState: unknown, formData: FormData) {
+  await requirePermission("tasks.update");
+
   const id = formData.get("id") as string;
   const completed = formData.get("completed") === "true";
   try {
@@ -96,6 +105,8 @@ export async function toggleTaskCompletion(_prevState: unknown, formData: FormDa
 }
 
 export async function addTaskDependency(_prevState: unknown, formData: FormData) {
+  await requirePermission("tasks.update");
+
   try {
     const taskId = formData.get("task_id") as string;
     const dependsOnTaskId = formData.get("depends_on_task_id") as string;
@@ -114,6 +125,8 @@ export async function addTaskDependency(_prevState: unknown, formData: FormData)
 }
 
 export async function removeTaskDependency(_prevState: unknown, formData: FormData) {
+  await requirePermission("tasks.update");
+
   try {
     const dependencyId = formData.get("dependency_id") as string;
     if (!dependencyId) return { error: "Dependency ID is required." };

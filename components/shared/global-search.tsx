@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Badge } from "@/components/shared/badge";
 import { Input } from "@/components/forms/input";
+import { useDebounce } from "@/hooks/use-debounce";
 import Link from "next/link";
 import type { SearchResult } from "@/actions/search";
 
@@ -26,24 +27,38 @@ export function GlobalSearchDialog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const latestTermRef = useRef("");
+  const debouncedQuery = useDebounce(query, 300);
 
-  function handleSearch(value: string) {
-    setQuery(value);
-    if (value.trim().length < 2) {
+  useEffect(() => {
+    const term = debouncedQuery.trim();
+    if (term.length < 2) {
+      latestTermRef.current = "";
       setResults([]);
       setHasSearched(false);
+      setError(null);
       return;
     }
+
+    latestTermRef.current = term;
     setHasSearched(true);
     startTransition(async () => {
       const formData = new FormData();
-      formData.set("query", value);
+      formData.set("query", term);
       const { globalSearch } = await import("@/actions/search");
       const res = await globalSearch(null, formData);
+      if (latestTermRef.current !== term) return;
+      if (res.error) {
+        setError(res.error);
+        setResults([]);
+        return;
+      }
+      setError(null);
       if (res.results) setResults(res.results);
     });
-  }
+  }, [debouncedQuery]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/60 px-4" onClick={onClose}>
@@ -64,7 +79,7 @@ export function GlobalSearchDialog({ onClose }: { onClose: () => void }) {
           <Input
             autoFocus
             value={query}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search projects, tasks, clients..."
             className="pl-11 h-14 text-body-md border-0 border-b border-hairline rounded-b-none"
           />
@@ -75,13 +90,19 @@ export function GlobalSearchDialog({ onClose }: { onClose: () => void }) {
             <p className="px-3 py-6 text-body-sm text-muted text-center">Searching...</p>
           )}
 
-          {!isPending && hasSearched && results.length === 0 && (
+          {!isPending && error && (
+            <p role="alert" className="px-3 py-6 text-body-sm text-error text-center">
+              {error}
+            </p>
+          )}
+
+          {!isPending && !error && hasSearched && results.length === 0 && (
             <p className="px-3 py-6 text-body-sm text-muted-soft text-center">
               No results for &quot;{query}&quot;.
             </p>
           )}
 
-          {!isPending && results.length > 0 && (
+          {!isPending && !error && results.length > 0 && (
             <div className="space-y-1">
               {results.map((result) => {
                 const config = TYPE_CONFIG[result.type] || { label: result.type, icon: "?" };

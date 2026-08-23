@@ -1,7 +1,7 @@
 "use server";
 
 import { UsersService } from "@/features/users";
-import { getUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { countRows, query, queryOne, type InValue } from "@/lib/turso/client";
 import { ActivityService } from "@/services/activity.service";
 import { revalidatePath } from "next/cache";
@@ -11,6 +11,8 @@ function placeholders(ids: string[]): string {
 }
 
 export async function updateRolePermissions(roleId: string, permissionIds: string[]) {
+  await requirePermission("roles.update");
+
   try {
     const role = await queryOne<{ name: string }>(
       "SELECT name FROM roles WHERE id = ? LIMIT 1",
@@ -57,7 +59,7 @@ export async function updateRolePermissions(roleId: string, permissionIds: strin
           )
         : [];
 
-    const actor = await getUser();
+    const actor = await requirePermission("roles.update");
 
     if (actor) {
       await ActivityService.log({
@@ -77,6 +79,8 @@ export async function updateRolePermissions(roleId: string, permissionIds: strin
 }
 
 export async function deleteRole(roleId: string) {
+  await requirePermission("roles.delete");
+
   try {
     const role = await queryOne<{ name: string }>(
       "SELECT name FROM roles WHERE id = ? LIMIT 1",
@@ -98,7 +102,7 @@ export async function deleteRole(roleId: string) {
 
     await UsersService.softDeleteRole(roleId);
 
-    const actor = await getUser();
+    const actor = await requirePermission("roles.delete");
 
     if (actor) {
       await ActivityService.log({

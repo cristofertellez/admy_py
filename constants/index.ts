@@ -70,3 +70,48 @@ export const FILE_TYPES_ALLOWED = [
 ] as const;
 
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+export const LANGUAGE_OPTIONS = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Español" },
+] as const;
+
+export const THEME_OPTIONS = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+] as const;
+
+// Curated list of common IANA timezones shown in user preferences.
+export const TIMEZONE_OPTIONS = [
+  { value: "UTC", label: "UTC" },
+  { value: "America/Argentina/Buenos_Aires", label: "Buenos Aires (GMT-3)" },
+  { value: "America/La_Paz", label: "La Paz (GMT-4)" },
+  { value: "America/Asuncion", label: "Asunción (GMT-4)" },
+  { value: "America/Santiago", label: "Santiago (GMT-4)" },
+  { value: "America/Caracas", label: "Caracas (GMT-4)" },
+  { value: "America/New_York", label: "New York (GMT-5)" },
+  { value: "America/Bogota", label: "Bogotá (GMT-5)" },
+  { value: "America/Havana", label: "Havana (GMT-5)" },
+  { value: "America/Lima", label: "Lima (GMT-5)" },
+  { value: "America/Mexico_City", label: "Mexico City (GMT-6)" },
+  { value: "America/Chicago", label: "Chicago (GMT-6)" },
+  { value: "America/Denver", label: "Denver (GMT-7)" },
+  { value: "America/Los_Angeles", label: "Los Angeles (GMT-8)" },
+  { value: "America/Sao_Paulo", label: "São Paulo (GMT-3)" },
+  { value: "Europe/London", label: "London (GMT+0)" },
+  { value: "Europe/Lisbon", label: "Lisbon (GMT+0)" },
+  { value: "Europe/Madrid", label: "Madrid (GMT+1)" },
+  { value: "Europe/Paris", label: "Paris (GMT+1)" },
+  { value: "Europe/Berlin", label: "Berlin (GMT+1)" },
+  { value: "Europe/Rome", label: "Rome (GMT+1)" },
+  { value: "Europe/Amsterdam", label: "Amsterdam (GMT+1)" },
+  { value: "Europe/Moscow", label: "Moscow (GMT+3)" },
+  { value: "Asia/Dubai", label: "Dubai (GMT+4)" },
+  { value: "Asia/Karachi", label: "Karachi (GMT+5)" },
+  { value: "Asia/Kolkata", label: "Mumbai (GMT+5:30)" },
+  { value: "Asia/Shanghai", label: "Shanghai (GMT+8)" },
+  { value: "Asia/Tokyo", label: "Tokyo (GMT+9)" },
+  { value: "Asia/Seoul", label: "Seoul (GMT+9)" },
+  { value: "Australia/Sydney", label: "Sydney (GMT+10)" },
+] as const;

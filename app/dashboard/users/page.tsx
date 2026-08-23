@@ -1,3 +1,4 @@
+import { requirePermission } from "@/lib/auth";
 import { UsersService } from "@/features/users";
 import { UsersTable } from "./users-table";
 import type { Metadata } from "next";
@@ -18,6 +19,7 @@ interface UsersPageProps {
 }
 
 export default async function UsersPage({ searchParams }: UsersPageProps) {
+  await requirePermission("users.read");
   const params = await searchParams;
 
   const search = params.search?.trim() || undefined;
