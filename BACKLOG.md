@@ -1412,9 +1412,11 @@ Editar Cliente
 - [ ] Validar actualización
 - [ ] Validar historial
 
+Implementación: edición de clientes vía modal en `/dashboard/clients` (`updateClient` con esquema Zod compartido, guard `clients.update` y auditoría `updated_client` con diff `old_value`/`new_value` solo de campos modificados; sin cambios reales no se escribe evento).
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -1719,7 +1721,7 @@ Registrar.
 - [x] Comentarios
 - [x] Creación de proyectos
 
-Implementación: eventos en `activity_logs` desde la capa de acciones — `created_client`/`updated_client` (con diff old/new por campo), `archived_client`/`restored_client`, `assigned_intermediary`/`removed_intermediary`, `uploaded_file`/`deleted_file` (entidad normalizada a mayúscula inicial: "Client", "Project", etc., para que el historial del cliente los resuelva), `created_project` con referencia al cliente, y comentarios (`created_comment` para proyectos; `created_client_comment`/`replied_client_comment`/`updated_client_comment`/`deleted_client_comment` vía Historia 4.9). Escritura centralizada en `ActivityService.log`; los fallos de auditoría no bloquean la operación principal.
+Implementación: eventos en `activity_logs` desde la capa de acciones — `created_client`/`updated_client` (con diff old/new por campo), `archived_client`/`restored_client`, `assigned_intermediary`/`removed_intermediary`, `uploaded_file`/`deleted_file` (entidad normalizada a mayúscula inicial: "Client", "Project", etc., para que el historial del cliente los resuelva), `created_project` con referencia al cliente, y comentarios (`created_comment` para proyectos; `created_client_comment`/`replied_client_comment`/`updated_client_comment`/`deleted_client_comment` vía Historia 4.9). Escritura centralizada en `ActivityService.log`; los fallos de auditoría no bloquean la operación principal. Trazabilidad en timeline: `ActivityTimeline` muestra el sujeto de cada evento (proyecto, archivo, intermediario, empresa o comentario) vía `getActivityEventDetail` y enlaza a Project/Client vía `getActivityEntityHref`. QA en `docs/qa/historia-4.12-auditoria-del-cliente.md`.
 
 Estado
 
@@ -1781,7 +1783,7 @@ Permitir visualizar todos los intermediarios registrados.
 ### Backend
 
 - [x] Consulta paginada
-- [ ] Búsqueda
+- [x] Búsqueda
 - [x] Filtros
 - [x] Ordenamiento
 - [x] Cantidad de clientes asignados
@@ -1790,9 +1792,9 @@ Permitir visualizar todos los intermediarios registrados.
 ### Frontend
 
 - [x] DataTable
-- [ ] Barra de búsqueda
-- [ ] Indicadores rápidos
-- [ ] Acciones rápidas
+- [x] Barra de búsqueda
+- [x] Indicadores rápidos
+- [x] Acciones rápidas
 
 ### QA
 
@@ -1800,9 +1802,11 @@ Permitir visualizar todos los intermediarios registrados.
 - [ ] Validar búsqueda
 - [ ] Validar rendimiento
 
+Implementación: `/dashboard/intermediaries` con estado en URL (search, status, page), búsqueda debounced server-side (nombre/email) y filtro de estado con `IntermediariesService.list` (`total` + LIMIT/OFFSET), indicadores rápidos Total/Active/Inactive vía `getStats()`, acciones View/Edit/Deactivate-Activate con confirmación previa al desactivado, resultados tipados y feedback accesible (`aria-live`); detalle en `/dashboard/intermediaries/[id]` con clientes asignados.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -1818,13 +1822,13 @@ Crear Intermediario
 
 - [x] Crear usuario
 - [x] Asignar rol Intermediary
-- [ ] Registrar auditoría
+- [x] Registrar auditoría
 
 ### Frontend
 
 - [x] Formulario
 - [x] Validaciones
-- [ ] Confirmación
+- [x] Confirmación
 
 Campos
 
@@ -1837,11 +1841,13 @@ Campos
 ### QA
 
 - [ ] Validar creación
-- [ ] Validar correo duplicado
+- [x] Validar correo duplicado
+
+Implementación: `createIntermediary` (guard `intermediaries.create`, esquema Zod compartido `intermediarySchema`, rol Intermediary asignado en servicio) con auditoría en `activity_logs` (`created_intermediary`), verificación amigable de correo duplicado y modal de confirmación.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1855,21 +1861,23 @@ Editar Intermediario
 
 ### Backend
 
-- [ ] Actualizar información
-- [ ] Registrar auditoría
+- [x] Actualizar información
+- [x] Registrar auditoría
 
 ### Frontend
 
 - [x] Formulario
-- [ ] Confirmación
+- [x] Confirmación
 
 ### QA
 
 - [ ] Validar actualización
 
+Implementación: `updateIntermediary` (guard `intermediaries.update`, esquema Zod compartido `intermediarySchema`) con auditoría en `activity_logs` (`updated_intermediary`, diff `old_value`/`new_value` solo de campos modificados), corrección del email que ahora sí se persiste con verificación de duplicados, y modal de edición con confirmación.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1890,11 +1898,11 @@ Permitir asignar múltiples clientes a un intermediario.
 - [x] Asignar cliente
 - [x] Remover cliente
 - [x] Validar duplicados
-- [ ] Registrar auditoría
+- [x] Registrar auditoría
 
 ### Frontend
 
-- [ ] Selector múltiple
+- [x] Selector múltiple
 - [x] Lista de clientes asignados
 - [x] Buscador
 
@@ -1903,9 +1911,11 @@ Permitir asignar múltiples clientes a un intermediario.
 - [ ] Asignación correcta
 - [ ] Eliminación correcta
 
+Implementación: selector múltiple en `/dashboard/intermediaries/[id]` (`assigned-clients-card.tsx`) con buscador client-side (empresa/contacto/correo), checkboxes con estado por cliente ("Current" deshabilitado, "Reassign" cuando pertenece a otro intermediario) y confirmación previa para remover. Acciones `assignClientsToIntermediary` (esquema Zod `assignClientsToIntermediarySchema`, guard `clients.update`, omite duplicados sin fallar y reasigna clientes de otros intermediarios) y `removeClientFromIntermediary` (valida que el cliente esté asignado a este intermediario), ambas con auditoría en `activity_logs` (`assigned_intermediary`/`removed_intermediary` con old/new) y revalidación de las páginas afectadas. Servicio: `ClientsService.listCandidatesForIntermediary` (con `clientScope`) y `ClientsService.assignClientsToIntermediary`. TypeScript, ESLint y build verificados sin errores.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -1931,17 +1941,19 @@ Vista General del Intermediario
 
 - [x] Dashboard (vista general)
 - [x] Tarjetas resumen
-- [ ] Timeline
-- [ ] Navegación por pestañas
+- [x] Timeline
+- [x] Navegación por pestañas
 
 ### QA
 
 - [ ] Información correcta
 - [ ] Responsive
 
+Implementación: `/dashboard/intermediaries/[id]` reconstruida como vista dashboard con tarjetas Total/Active/Completed Projects y Worked Hours (reutiliza `IntermediaryReportsService.getReport`, Historia 5.12), widgets "Upcoming Deliveries" (hitos y proyectos con vencimiento en 30 días) y "Last Activity" (`IntermediariesService.getLastActivity`), y pestañas Overview | Timeline (`intermediary-tabs.tsx`) con estado en URL (`tab`, `q`, `category`, `page`). La pestaña Timeline agrega los eventos de la cartera del intermediario vía `IntermediariesService.getHistory` (eventos `entity='Client'` de clientes asignados + eventos de sus proyectos + comentarios asociados) reutilizando `CLIENT_HISTORY_ACTIONS`, `HistoryFilters` y `ActivityTimeline`; Overview integra la información personal y la tarjeta de clientes asignados con el selector múltiple de 5.4. Build, TypeScript y ESLint verificados sin errores.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -1959,21 +1971,23 @@ Crear un panel exclusivo para el rol Intermediary.
 
 ### Widgets
 
-- [ ] Clientes activos
-- [ ] Proyectos activos
-- [ ] Proyectos próximos a vencer
-- [ ] Tareas pendientes
-- [ ] Últimos comentarios
+- [x] Clientes activos
+- [x] Proyectos activos
+- [x] Proyectos próximos a vencer
+- [x] Tareas pendientes
+- [x] Últimos comentarios
 - [x] Actividad reciente
 
 ### QA
 
-- [ ] Actualización automática
+- [x] Actualización automática
 - [ ] Información correcta
+
+Implementación: `/dashboard` renderiza un panel exclusivo cuando la sesión tiene rol Intermediary (`IntermediaryPanel`, Server Component) con KPIs enlazados (Active Clients, Active Projects, Due in 30 Days, Pending Tasks), listas "Projects Due Soon" (proyectos activos con `estimated_end_date` dentro de 30 días), "Pending Tasks" (ordenadas por fecha estimada) y "Latest Comments" (fusión de `client_comments` + `project_comments` con autor y enlace al cliente/proyecto). Datos vía `DashboardService.getIntermediaryPanel` usando `clientScope`/`projectScope` (autorización en capa de datos; solo rol Intermediary). Actualización automática cubierta con `revalidatePath("/dashboard")` en las server actions que mutan proyectos, tareas, comentarios, clientes e intermediario asignado. QA manual pendiente.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -1987,27 +2001,29 @@ Seguimiento de Proyectos
 
 ### Backend
 
-- [ ] Obtener proyectos asignados
-- [ ] Calcular progreso
-- [ ] Obtener estado
-- [ ] Obtener porcentaje completado
+- [x] Obtener proyectos asignados
+- [x] Calcular progreso
+- [x] Obtener estado
+- [x] Obtener porcentaje completado
 
 ### Frontend
 
-- [ ] Lista de proyectos
-- [ ] Tarjetas
-- [ ] Barra de progreso
-- [ ] Estado visual
-- [ ] Fechas importantes
+- [x] Lista de proyectos
+- [x] Tarjetas
+- [x] Barra de progreso
+- [x] Estado visual
+- [x] Fechas importantes
 
 ### QA
 
 - [ ] Progreso correcto
 - [ ] Estados correctos
 
+Implementación: pestaña "Projects (N)" en `/dashboard/intermediaries/[id]` (`intermediary-tabs.tsx`) con tarjetas por proyecto agrupadas en Active/Finalized. Los datos provienen de `IntermediaryReportsService.getReport` (proyectos de los clientes asignados al intermediario, mismos criterios de visibilidad que `lib/auth-scope.ts`): progreso vía `completion_percentage`, estado y prioridad, horas trabajadas/estimadas, cliente y fechas estimadas. Cada tarjeta incluye nombre enlazado a `/dashboard/projects/{id}`, empresa del cliente, badge de estado codificado (Completed=success, Cancelled/Archived/Suspended=error, resto=warning), badge "Overdue" cuando `estimated_end_date` pasó y el proyecto sigue activo, barra de progreso accesible (`role="progressbar"` con aria-valuenow/min/max) y fechas importantes (inicio/fin). Build, TypeScript y ESLint verificados sin errores.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -2035,9 +2051,11 @@ El intermediario podrá visualizar.
 - [ ] Solo información permitida
 - [x] Validar permisos
 
+Implementación: `/dashboard/projects/[id]` ya accesible para el rol Intermediary con autorización en capa de datos (`assertProjectVisible` + `projectScope`/`attachmentScope` en tareas, hitos, comentarios y archivos), de modo que cada rol recibe solo información permitida. La página calcula capacidades vía `hasPermission` y las pasa a `ProjectTabs`: `canCreateTasks`/`canUpdateTasks`/`canManageMilestones` (ocultan creación/edición sin permiso) y los nuevos flags `canUploadFiles`/`canDeleteFiles`/`canDownloadFiles`, `currentUserId`, `canCreateComments`/`canModerateComments`. Nueva pestaña "Documents" con archivos compartidos del proyecto (`attachments` con `entity_type='project'`) reutilizando `DocumentsTab`, pestaña Comments con hilos/responder/editar (Historia 5.9) y Timeline/Milestones/Tasks existentes. El formulario de comentarios solo se muestra con `comments.create`.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2051,14 +2069,14 @@ Comentarios
 
 ### Backend
 
-- [ ] Crear comentario
-- [ ] Editar comentario propio
-- [ ] Responder comentarios
-- [ ] Registrar auditoría
+- [x] Crear comentario
+- [x] Editar comentario propio
+- [x] Responder comentarios
+- [x] Registrar auditoría
 
 ### Frontend
 
-- [ ] Timeline
+- [x] Timeline
 - [ ] Editor enriquecido
 - [ ] Menciones
 - [ ] Adjuntar archivos
@@ -2069,9 +2087,11 @@ Comentarios
 - [ ] Editar
 - [ ] Responder
 
+Implementación: `CommentsService.listByProject` ahora devuelve hilos completos (respuestas incluidas), `createProjectComment` valida que el comentario padre pertenezca al mismo proyecto y se añadieron `updateProjectComment` (autor o moderador con `comments.update`) y moderación de borrado alineada a comentarios de cliente (`comments.delete`). Acciones: `createProjectCommentAction` soporta respuestas (auditoría `replied_comment` vs `created_comment`, notificación `comment_created`), nuevas `updateProjectCommentAction` (`updated_comment`) y borrado con auditoría (`deleted_comment`). UI: pestaña Comments de `/dashboard/projects/[id]` reconstruida como timeline agrupado por hilos (patrón Historia 4.9) con responder, edición inline, borrado con confirmación, controles gated por permisos/autoría; el formulario raíz conserva la cola offline PWA (`project-comment.create`). Menciones y adjuntos en comentarios quedan para una iteración posterior.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -2085,25 +2105,27 @@ Archivos Compartidos
 
 ### Backend
 
-- [ ] Consultar archivos
-- [ ] Subir archivos permitidos
-- [ ] Descargar archivos
-- [ ] Registrar actividad
+- [x] Consultar archivos
+- [x] Subir archivos permitidos
+- [x] Descargar archivos
+- [x] Registrar actividad
 
 ### Frontend
 
-- [ ] Lista
-- [ ] Vista previa
-- [ ] Descarga
+- [x] Lista
+- [x] Vista previa
+- [x] Descarga
 
 ### QA
 
 - [ ] Permisos
 - [ ] Restricciones
 
+Implementación: pestaña "Documents" en `/dashboard/projects/[id]` reutilizando `DocumentsTab` (ahora parametrizada por `entityType`) sobre `attachments` (`entity_type='project'`) con `FilesService.list` + `attachmentScope` (solo archivos de proyectos visibles). Subida vía modal drag & drop (`uploadFile`: MIME/tamaño validados, `assertEntityVisible`, auditoría `uploaded_file`), vista previa/descarga con URL firmada (`getFileUrl`, auditoría `downloaded_file`). `uploadFile`/`deleteFile` ahora revalidan `/dashboard/projects/{id}`. El rol Intermediary recibió el permiso `files.upload` en la jerarquía RBAC ("subir archivos permitidos"); sin `files.delete`, por lo que no puede eliminar archivos ajenos.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2117,21 +2139,23 @@ Notificaciones
 
 ### Mostrar
 
-- [ ] Proyecto actualizado
-- [ ] Nuevo comentario
-- [ ] Nueva tarea visible
-- [ ] Proyecto finalizado
-- [ ] Proyecto retrasado
-- [ ] Fecha límite próxima
+- [x] Proyecto actualizado
+- [x] Nuevo comentario
+- [x] Nueva tarea visible
+- [x] Proyecto finalizado
+- [x] Proyecto retrasado
+- [x] Fecha límite próxima
 
 ### QA
 
 - [ ] Recepción correcta
-- [ ] Sin duplicados
+- [x] Sin duplicados
+
+Implementación: migración `00005_notifications_dedupe_sqlite.sql` (columna `dedupe_key` + índice único parcial que garantiza ausencia de duplicados a nivel BD). Disparadores en `features/notifications/notification-triggers.ts` (`project_updated`, `comment_created`, `task_created`, `project_completed`) invocados desde las server actions de proyectos, comentarios y tareas; los fallos de notificación nunca bloquean la operación principal. Destinatarios: intermediarios activos asignados al cliente del proyecto (espejo del scope de visibilidad de `lib/auth-scope.ts`), excluyendo al actor. Notificaciones basadas en tiempo (`project_delayed`, `deadline_upcoming` para proyectos e hitos dentro de 7 días) generadas de forma idempotente por día (clave de dedupe con fecha) al cargar el dashboard o la página de notificaciones. UI: `/dashboard/notifications` con etiquetas legibles por tipo, badges semánticos y enlace directo a la entidad relacionada.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2145,21 +2169,23 @@ Reportes del Intermediario
 
 ### Reportes
 
-- [ ] Proyectos activos
-- [ ] Proyectos finalizados
-- [ ] Estado de clientes
-- [ ] Productividad
-- [ ] Próximas entregas
+- [x] Proyectos activos
+- [x] Proyectos finalizados
+- [x] Estado de clientes
+- [x] Productividad
+- [x] Próximas entregas
 
 ### Exportaciones
 
-- [ ] PDF
-- [ ] Excel
-- [ ] CSV
+- [x] PDF
+- [x] Excel
+- [x] CSV
+
+Implementación: `IntermediaryReportsService` (`features/intermediaries/intermediaries.reports.service.ts`) agrega el reporte de cartera con alcance restringido a los clientes asignados (espejo del scope de `lib/auth-scope.ts`): resumen (proyectos activos/finalizados, clientes, tasas de completitud y utilización de horas), listado de proyectos, estado de clientes con contadores, productividad por estados de tarea y horas, y próximas entregas (hitos y proyectos dentro de 30 días). UI integrada en `/dashboard/intermediaries/[id]` (tarjetas de resumen + botones de exportación); el propio intermediario puede consultar su reporte vía guard `assertCanViewIntermediaryDetail` (self-access) y navegación "My Report" en el sidebar. Exportaciones: PDF generado en cliente con jsPDF + AutoTable; Excel (.xlsx) y CSV vía route handler `/api/intermediaries/[id]/report/export` (SheetJS) con autenticación, autorización (`reports.export` habilitado al rol Intermediary) y validación de formato. Dependencias añadidas: `xlsx`, `jspdf`, `jspdf-autotable`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2173,16 +2199,18 @@ Auditoría
 
 Registrar.
 
-- [ ] Inicio de sesión
-- [ ] Asignación de clientes
-- [ ] Comentarios
-- [ ] Descarga de archivos
-- [ ] Consulta de proyectos
-- [ ] Cambios de perfil
+- [x] Inicio de sesión
+- [x] Asignación de clientes
+- [x] Comentarios
+- [x] Descarga de archivos
+- [x] Consulta de proyectos
+- [x] Cambios de perfil
+
+Implementación: eventos cubiertos por la infraestructura de auditoría (`logged_in`/`logged_out` en `actions/auth.ts`, `assigned_intermediary`/`removed_intermediary` en `actions/clients.ts`, `created_comment` y eventos de comentarios 4.9 en `actions/comments.ts`, `updated_profile`/`changed_password`/`updated_avatar` en `actions/profile.ts`). Descarga de archivos: `downloaded_file` en `getFileUrl` (`actions/files.ts`) tras emitir la URL firmada, con autorización previa a nivel de datos (`assertEntityVisible`) y nombre del archivo en `new_value`; cubre descarga y vista previa. Consulta de proyectos: `viewed_project` al renderizar `/dashboard/projects/[id]` vía `ActivityService.logAccessOnce`, que deduplica por usuario/acción/entidad dentro de una ventana de 60 s para colapsar refrescos y prefetch; solo se registra tras pasar la verificación de visibilidad (`assertProjectVisible`). Los eventos de acceso (`viewed_project`, `downloaded_file`, constante `ACCESS_AUDIT_ACTIONS`) quedan excluidos de los historiales de cliente/intermediario y del widget Last Activity, cuyo alcance son eventos de negocio (BACKLOG 4.7/5.5); la consulta global vive en `/dashboard/activity`. QA en `docs/qa/historia-5.13-auditoria.md`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2197,22 +2225,24 @@ Restricciones del Rol
 El intermediario NO podrá.
 
 - [x] Crear usuarios
-- [ ] Eliminar clientes
-- [ ] Modificar permisos
+- [x] Eliminar clientes
+- [x] Modificar permisos
 - [x] Cambiar roles
-- [ ] Ver proyectos no asignados
-- [ ] Acceder a información interna del Developer
-- [ ] Modificar configuraciones globales
+- [x] Ver proyectos no asignados
+- [x] Acceder a información interna del Developer
+- [x] Modificar configuraciones globales
 
 ### QA
 
-- [ ] Validar RBAC
-- [ ] Validar autorización a nivel de datos
-- [ ] Intentos de acceso indebido
+- [x] Validar RBAC
+- [x] Validar autorización a nivel de datos
+- [x] Intentos de acceso indebido
+
+Implementación: verificación end-to-end de las tres capas — RBAC (`PERMISSION_HIERARCHY` en `lib/auth.ts` + `requirePermission` en todas las acciones: `users.*`, `roles.*`, `settings.*`, `clients.update/delete` fuera del rol Intermediary), autorización de datos (`projectScope`/`clientScope`/asserts en `lib/auth-scope.ts`: solo proyectos/clientes de su cartera, con denegaciones auditadas como `access_denied`) y rutas (`proxy.ts` + `lib/routes.ts` bloquean `/dashboard/users|roles|settings|activity|admin`, re-verificado server-side en cada página). Se ocultaron las opciones sin permiso en las superficies accesibles por el rol: ClientsTable (Add/Edit/Archive), ProjectsTable (New/Edit/Archive), TasksTable (New/Edit, también en proyectos), FilesTable (Upload/Delete; Download visible) y ProjectTabs/TaskDetail (tareas, kanban, subtareas, dependencias, checklist e hitos vía props `canCreate*`/`canUpdate*` calculadas con `hasPermission`). QA en `docs/qa/historia-5.14-restricciones-rol.md`. Build, TypeScript y ESLint verificados sin errores.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2271,19 +2301,19 @@ Visualizar todos los proyectos disponibles según los permisos del usuario.
 
 - [x] Consulta paginada
 - [x] Ordenamiento
-- [ ] Búsqueda
+- [x] Búsqueda
 - [x] Filtros
-- [ ] Conteo total
-- [ ] Consulta optimizada
+- [x] Conteo total
+- [x] Consulta optimizada
 
 ### Frontend
 
 - [x] DataTable
-- [ ] Búsqueda
+- [x] Búsqueda
 - [x] Filtros rápidos
 - [x] Filtros avanzados
-- [ ] Acciones masivas
-- [ ] Columnas configurables
+- [x] Acciones masivas
+- [x] Columnas configurables
 
 Filtros
 
@@ -2296,6 +2326,8 @@ Filtros
 - Fecha límite
 - Etiquetas
 
+Implementación: `/dashboard/projects` con estado en URL (search, status, priority, active, page), búsqueda debounced server-side (nombre/código/descripción/empresa del cliente) y paginación real con `ProjectsService.list` (`total` vía COUNT con los mismos parámetros y consulta de página LIMIT/OFFSET sobre JOINs a clients/users, apoyada en índices existentes en `client_id`, `intermediary_id` y `status`). Filtros rápidos de estado, prioridad y estado activo/archivado. Acciones masivas Archive/Restore mediante selección de filas (`getRowId` estable en el DataTable compartido y acción `bulkToggleProjectsActive` con confirmación previa y auditoría `archived_project`/`restored_project`), columnas configurables vía la barra del DataTable y feedback accesible (`aria-live`). Autorización con guard `requirePermission("projects.read")` en la página, `projectScope` en la capa de datos y controles gated por permisos. Build, TypeScript y ESLint verificados sin errores.
+
 ### QA
 
 - [ ] Rendimiento
@@ -2305,7 +2337,7 @@ Filtros
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -2320,15 +2352,15 @@ Crear Proyecto
 ### Backend
 
 - [x] Crear Server Action
-- [ ] Validar datos
-- [ ] Registrar proyecto
-- [ ] Registrar auditoría
+- [x] Validar datos
+- [x] Registrar proyecto
+- [x] Registrar auditoría
 
 ### Frontend
 
 - [x] Formulario completo
 - [x] Validaciones Zod
-- [ ] Confirmación
+- [x] Confirmación
 
 Información inicial
 
@@ -2341,18 +2373,20 @@ Información inicial
 - Fecha inicio
 - Fecha fin estimada
 - Horas estimadas
-- Color
-- Etiquetas
+- Color (cubierto por la paleta de etiquetas de la Historia 6.10)
+- Etiquetas (selector integrado en el formulario, Historia 6.10)
 
 ### QA
 
 - [x] Validaciones
-- [ ] Duplicados
-- [ ] Permisos
+- [x] Duplicados
+- [x] Permisos
+
+Implementación: validación Zod compartida (`schemas/project.ts`: enums de estado/prioridad, longitudes, fechas coherentes, horas ≥ 0) aplicada en el server action; reglas de negocio en `ProjectsService.create` (cliente activo existente, intermediario con rol Intermediary activo, duplicado de nombre por cliente con mensaje amigable); guard `requirePermission("projects.create")`; auditoría `created_project` con cliente/estado/prioridad; modal con confirmación de éxito, selector de cliente e intermediario (sin UUIDs manuales) y estados/prioridades desde `constants`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2366,23 +2400,25 @@ Editar Proyecto
 
 ### Backend
 
-- [ ] Actualizar información
-- [ ] Validar cambios
-- [ ] Registrar auditoría
+- [x] Actualizar información
+- [x] Validar cambios
+- [x] Registrar auditoría
 
 ### Frontend
 
 - [x] Formulario
-- [ ] Historial de cambios
+- [x] Historial de cambios
 
 ### QA
 
-- [ ] Actualización
-- [ ] Auditoría
+- [x] Actualización
+- [x] Auditoría
+
+Implementación: `updateProject` con esquema Zod de actualización (el cliente no se modifica vía edición), diff campo a campo contra el estado previo (`getById` también aplica autorización de capa de datos); auditoría `updated_project` solo con campos modificados (`old_value`/`new_value`) y sin eventos cuando no hay cambios; notificaciones preservadas. El historial de cambios se muestra en la pestaña "Activity" del detalle (`ProjectsService.getHistory`: eventos del proyecto + comentarios, excluye accesos) reutilizando `ActivityTimeline` con paginación en URL.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2394,30 +2430,38 @@ P0
 
 Estados del Proyecto
 
-Estados disponibles
+Estados disponibles (según PRD; la lista del backlog original era un subconjunto)
 
-- Borrador
-- Planificado
-- Activo
-- En revisión
-- Suspendido
-- Finalizado
-- Cancelado
-- Archivado
+- Proposed (Propuesto)
+- Pending (Pendiente)
+- Planning (Planificación)
+- Design (Diseño)
+- Development (Desarrollo)
+- QA
+- In Review (En revisión)
+- Corrections (Correcciones)
+- Ready for Delivery (Listo para entrega)
+- Delivered (Entregado)
+- Completed (Finalizado)
+- Suspended (Suspendido)
+- Cancelled (Cancelado)
+- Archived (Archivado)
 
 ### Backend
 
-- [ ] Validar transiciones
-- [ ] Registrar cambios
+- [x] Validar transiciones
+- [x] Registrar cambios
 
 ### QA
 
-- [ ] Estados válidos
-- [ ] Estados inválidos
+- [x] Estados válidos
+- [x] Estados inválidos
+
+Implementación: máquina de estados declarativa `PROJECT_STATUS_TRANSITIONS` en `constants` siguiendo el pipeline del PRD (Proposed → … → Delivered → Completed; Suspended pausa; Cancelled/Completed terminales) con validación pura reutilizable en `features/projects/project-status.ts`; el server action valida la transición antes de escribir y rechaza cambios inválidos con mensaje claro; el modal de edición solo ofrece estados alcanzables desde el actual. Cada cambio de estado se audita como `changed_project_status` (old/new status).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2482,15 +2526,17 @@ Calcular automáticamente
 
 ### QA
 
-- [ ] Cálculos correctos
+- [x] Cálculos correctos
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
 P0
+
+Implementación: cálculo puro en `features/projects/projects-indicators.ts` (`computeEstimates`/`computeSchedule`: horas estimadas/consumidas/restantes, variación de esfuerzo y de tiempo, desviación firmada en días, retraso, progreso ponderado por peso de tarea y progreso esperado según cronograma). Datos agregados por `ProjectIndicatorsService.getByProject` (histórico completo de time_entries → roll-up tareas → campo del proyecto; la ventana de 6 semanas se usa solo para el gráfico de carga de trabajo) y visualización en la pestaña "Indicators" del detalle del proyecto (`indicators-tab.tsx`, tarjeta "Effort" + "Estimates vs Actual"). TypeScript y ESLint verificados sin errores.
 
 ---
 
@@ -2500,27 +2546,29 @@ Asignación de Responsables
 
 ### Backend
 
-- [ ] Asignar Developers
-- [ ] Asignar Intermediarios
+- [x] Asignar Developers
+- [x] Asignar Intermediarios
 - [x] Asignar cliente
 
 ### Frontend
 
-- [ ] Selector múltiple
-- [ ] Gestión de miembros
+- [x] Selector múltiple
+- [x] Gestión de miembros
 
 ### QA
 
-- [ ] Permisos
-- [ ] Duplicados
+- [x] Permisos
+- [x] Duplicados
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
 P0
+
+Implementación: migración `00006_project_members_sqlite.sql` (tabla `project_members` con FK a projects/users, `UNIQUE(project_id, user_id)` anti-duplicados e índices por proyecto y usuario), métodos `ProjectsService.listMembers` / `listAvailableMembers` / `assignMembers` / `removeMember` (validación de rol Developer/Intermediary activo + `assertProjectVisible`), esquema Zod `assignProjectMembersSchema`, acciones `assignProjectMembers` / `removeProjectMember` protegidas por `projects.update` con auditoría (`assigned_project_member` / `removed_project_member`) y UI "Team" en el Overview del proyecto (selector múltiple con checkboxes agrupados por rol, remoción con confirmación; visible solo con `projects.update`). Los duplicados se omiten sin fallar. QA en `docs/qa/historia-6.7-asignacion-de-responsables.md`.
 
 ---
 
@@ -2530,23 +2578,25 @@ Dashboard del Proyecto
 
 Widgets
 
-- [ ] Estado actual
-- [ ] Progreso
-- [ ] Horas
-- [ ] Próximos hitos
+- [x] Estado actual
+- [x] Progreso
+- [x] Horas
+- [x] Próximos hitos
 - [x] Actividad reciente
-- [ ] Últimos comentarios
-- [ ] Últimos archivos
-- [ ] Riesgos
-- [ ] Indicadores
+- [x] Últimos comentarios
+- [x] Últimos archivos
+- [x] Riesgos
+- [x] Indicadores
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
 P0
+
+Implementación: componente servidor `project-dashboard.tsx` en `/dashboard/projects/[id]` con tarjetas Current Status (estado, prioridad, fechas reales), Progress (anillo con % real vs. progreso esperado del cronograma), Effort (horas estimadas/trabajadas/restantes), Health & Risks (salud y semáforo de riesgo de la Historia 6.9 con factores disparados y enlace a Indicators), Upcoming Deliveries (próximos hitos, vencidos en rojo), Latest Comments y Latest Files. Datos derivados de las consultas existentes de la página (sin requests adicionales). QA en `docs/qa/historia-6.8-6.14-dashboard-y-actividad.md`.
 
 ---
 
@@ -2556,21 +2606,23 @@ Indicadores del Proyecto
 
 Calcular automáticamente
 
-- [ ] % completado
-- [ ] % retraso
-- [ ] Horas utilizadas
-- [ ] Horas restantes
-- [ ] Productividad
-- [ ] Riesgo
-- [ ] Salud del proyecto
+- [x] % completado
+- [x] % retraso
+- [x] Horas utilizadas
+- [x] Horas restantes
+- [x] Productividad
+- [x] Riesgo
+- [x] Salud del proyecto
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
 P1
+
+Implementación: `buildProjectMetrics` en `features/projects/projects-indicators.ts` calcula % completado (ponderado por peso de tareas), % retraso (progreso esperado lineal − progreso real), horas utilizadas/restantes, productividad (tasa de finalización y promedio h/tarea completada), semáforo de riesgo según PRD §72 (sobrecosto de esfuerzo, deslizamiento, tareas bloqueadas, dependencias pendientes, hitos vencidos e inactividad) y salud del proyecto (healthy/at_risk/critical). Autorización de datos vía `assertProjectVisible` en `ProjectIndicatorsService`. UI: pestaña "Indicators" con tarjetas Health & Risk, Progress y Key Indicators.
 
 ---
 
@@ -2580,19 +2632,21 @@ Etiquetas
 
 ### Backend
 
-- [ ] Crear etiquetas
-- [ ] Editar etiquetas
-- [ ] Eliminar etiquetas
+- [x] Crear etiquetas
+- [x] Editar etiquetas
+- [x] Eliminar etiquetas
 
 ### Frontend
 
-- [ ] Selector
-- [ ] Colores
+- [x] Selector
+- [x] Colores
 - [x] Filtros
+
+Implementación: CRUD de etiquetas endurecido con esquema Zod compartido (`schemas/tag.ts`: nombre requerido ≤50, color restringido a la paleta oficial `TAG_COLOR_OPTIONS`), verificación amigable de nombres duplicados (case-insensitive) en `TagsService`, acciones `createTag`/`updateTag`/`deleteTag` con guards `tasks.*` (sin nuevos permisos fuera del backlog 2.8), respuestas tipadas `{ success | error }` y auditoría `created_tag`/`updated_tag`/`deleted_tag` en `activity_logs`; el borrado se apoya en el `ON DELETE CASCADE` de `project_tags`/`task_tags`. Integración con proyectos: campo `tags` en `projectSchema`/`projectUpdateSchema`, sincronización atómica vía `TagsService.setProjectTags` (batch transaccional, ids re-validados contra BD) desde las acciones create/update de proyectos, evento de auditoría dedicado `updated_project_tags` (old/new con nombres), selector multiselección con colores (`components/forms/tag-selector.tsx`) en el modal de crear/editar proyecto, chips coloreados (`TagChip`) en la tabla y cabecera del detalle, columna Tags en el listado y filtro por etiqueta en URL (`?tag=`) resuelto en servidor con `EXISTS` sobre `project_tags`. La página /dashboard/tags reutiliza `TagsService.list()` y muestra feedback accesible (`aria-live`) con confirmación previa al borrado.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2607,17 +2661,19 @@ Archivar Proyecto
 ### Backend
 
 - [x] Cambio de estado
-- [ ] Validar dependencias
-- [ ] Registrar auditoría
+- [x] Validar dependencias
+- [x] Registrar auditoría
 
 ### QA
 
-- [ ] Restauración
-- [ ] Restricciones
+- [x] Restauración
+- [x] Restricciones
+
+Implementación: `ProjectsService.archive` bloquea el archivado mientras existan tareas sin finalizar o hitos incompletos (mensaje amigable con cantidades) y marca `is_active = 0` + `deleted_at`; restauración vía `restore` con auditoría `restored_project`; acciones individuales y masivas (`bulkToggleProjectsActive`) protegidas por `projects.update`, con confirmación previa, feedback accesible (`aria-live`) y filtro de estado Activo/Archivado en la tabla (estado en URL).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2643,11 +2699,13 @@ El cliente nunca podrá modificar información estructural del proyecto.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
 P0
+
+Implementación: `/dashboard/projects/[id]` con pestañas filtradas por rol (`visibleTabsForRole`: Client/Intermediary sin Kanban de gestión), widgets de estado/progreso/entregas de la Historia 6.8 y autorización en tres capas — `projectScope`/`assertProjectVisible`/`attachmentScope` en la capa de datos y `requirePermission("projects.update"|"tasks.*")` en cada acción estructural (sin esos permisos el servidor redirige a `/unauthorized`). El rol Client conserva lectura de Tasks/Indicators/Milestones/Timeline/Documents/Comments/Activity según PRD §7. QA en `docs/qa/historia-6.12-6.13-vistas-cliente-intermediario.md`.
 
 ---
 
@@ -2666,11 +2724,13 @@ Permitir visualizar únicamente
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
 P0
+
+Implementación: mismo mecanismo de pestañas por rol que 6.12; el intermediario solo accede a proyectos de su cartera vía `assertProjectVisible` / `projectScope` / `attachmentScope`, con subida de archivos si posee `files.upload`, exportación con `reports.export` y widgets de progreso/actividad/entregas. Sin permisos estructurales (`projects.update`) no puede modificar el proyecto ni sus miembros/hitos.
 
 ---
 
@@ -2696,11 +2756,13 @@ Visualización
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
 P1
+
+Implementación: pestaña Activity sobre `ProjectsService.getHistory` ampliada con búsqueda server-side (acción, usuario, valores old/new JSON) y filtro por categoría mapeado a `PROJECT_HISTORY_ACTIONS` (project/files/comments, incluyendo los nuevos `assigned_project_member`/`removed_project_member` de la 6.7 y `updated_project_tags`); estado en URL (`q`, `category`, `page`) con búsqueda debounced reutilizando `HistoryFilters` (parametrizado con `idPrefix`/`categoryOptions`) y `ActivityTimeline`. Los eventos de acceso (`viewed_project`/`downloaded_file`) permanecen excluidos del timeline. Registro automático ya cubierto por las acciones: creación/edición/estado (6.2–6.4, 6.17), asignaciones (6.7), comentarios (7.x) y archivos (9.x). QA en `docs/qa/historia-6.8-6.14-dashboard-y-actividad.md`.
 
 ---
 
@@ -2720,11 +2782,13 @@ Mostrar
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
 P2
+
+Implementación: la pestaña "Indicators" del detalle del proyecto consolida las métricas desde `ProjectMetricsBundle`: duración planificada/real (tarjeta "Estimates vs Actual"), horas y productividad ("Effort" + "Key Indicators"), retrasos y riesgos (días de retraso, tareas atrasadas, hitos vencidos, semáforo) y progreso (anillo con progreso esperado). Carga de trabajo con gráficos de barras (`components/charts/bar-chart.tsx`): horas registradas por semana (últimas 6 semanas desde `time_entries`) y distribución de tareas por estado.
 
 ---
 
@@ -2757,19 +2821,21 @@ Auditoría
 
 Registrar
 
-- Creación
-- Edición
-- Eliminación lógica
-- Cambio de estado
-- Asignaciones
-- Cambios de fechas
-- Cambios de estimaciones
-- Archivos
-- Comentarios
+- [x] Creación (`created_project`)
+- [x] Edición (`updated_project`, diff old/new solo de campos modificados)
+- [x] Eliminación lógica (`archived_project` / `restored_project`)
+- [x] Cambio de estado (`changed_project_status`, old/new)
+- [x] Asignaciones (cambio de intermediario reflejado en el diff de `updated_project`; asignaciones de cliente/intermediario en sus historias)
+- [x] Cambios de fechas (incluidos en el diff de `updated_project`)
+- [x] Cambios de estimaciones (horas estimadas incluidas en el diff de `updated_project`)
+- [x] Archivos (`uploaded_file` / `downloaded_file` / `deleted_file`, Historia 5.12)
+- [x] Comentarios (`created_comment` y derivados, Historia 5.11)
+
+Implementación: todos los eventos se escriben vía `ActivityService.log` en `activity_logs` con actor, entidad y valores old/new; los fallos de auditoría no bloquean la operación principal. Visualización: pestaña "Activity" del detalle del proyecto con timeline agrupado por día y paginación en URL.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2783,33 +2849,35 @@ Permisos
 
 Developer
 
-- [ ] Acceso completo
+- [x] Acceso completo
 
 Intermediary
 
-- [ ] Solo proyectos asignados
+- [x] Solo proyectos asignados
 
 Client
 
-- [ ] Solo sus proyectos
+- [x] Solo sus proyectos
 
 Administrator
 
-- [ ] Gestión completa
+- [x] Gestión completa
 
 Super Administrator
 
-- [ ] Acceso total
+- [x] Acceso total
 
 ### QA
 
-- [ ] RBAC
-- [ ] Control de acceso a datos
-- [ ] Accesos indebidos
+- [x] RBAC
+- [x] Control de acceso a datos
+- [x] Accesos indebidos
+
+Implementación: RBAC ampliado en `lib/auth.ts` (`PERMISSION_HIERARCHY`): Administrator con gestión completa de los módulos operativos (`projects.*`, `clients.*`, `intermediaries.*`, `tasks.*`, `comments.*`, `files.*`, `reports.*`, `time-entries.*`; sin `users.*`/`roles.*`/`settings.*`) y Super Administrator con acceso total (mismo set que Developer). Nueva fuente única `lib/roles.ts` (`FULL_ACCESS_ROLES` + `hasFullAccess`) compartida por cliente y servidor; la capa de datos (`lib/auth-scope.ts`) omite el filtrado de visibilidad para los tres roles de acceso pleno y mantiene denegación por defecto para roles desconocidos, mientras Intermediary/Client conservan su alcance por cartera/email con denegaciones auditadas (`access_denied`). Pestañas de gestión del proyecto (Kanban) reservadas a los roles de acceso pleno (`project-tabs.tsx`). Semántica de "acceso pleno" unificada en moderación de comentarios, reporte global, estadísticas del dashboard y horas trabajadas. Migración `00007_admin_roles_sqlite.sql` siembra los roles Administrator y Super Administrator (idempotente). QA en `docs/qa/historia-6.18-permisos.md`. Build, TypeScript y ESLint verificados sin errores.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2821,24 +2889,26 @@ P0
 
 Exportación
 
-Permitir exportar
+### Formatos
 
-- PDF
-- Excel
-- CSV
+- [x] PDF
+- [x] Excel
+- [x] CSV
 
-Incluyendo
+### Contenido
 
-- Información general
-- Cronograma
-- Indicadores
-- Progreso
-- Horas
-- Actividad
+- [x] Información general
+- [x] Cronograma
+- [x] Indicadores
+- [x] Progreso
+- [x] Horas
+- [x] Actividad
+
+Implementación: `ProjectExportService` (`features/projects/projects-export.service.ts`) agrega los datos exportables del proyecto reutilizando los servicios existentes (proyecto + cliente + intermediario vía `ProjectsService.getById`, hitos vía `MilestonesService.listByProject`, indicadores/estimaciones/cronograma/progreso vía `ProjectIndicatorsService.getByProject` de las historias 6.6 / 6.9 / 6.15) más dos consultas propias: horas por integrante (agregación de `time_entries`) y actividad reciente (bitácora de la historia 6.17 sin eventos de acceso, últimos 100 eventos). Autorización en capa de datos (`assertProjectVisible`): cada rol solo exporta proyectos visibles para él; adicionalmente la exportación exige el permiso `reports.export` (habilitado a Developer e Intermediary). Exportaciones: Excel (.xlsx) multi-hoja (General, Schedule, Indicators, Progress, Hours, Activity) y CSV vía route handler `/api/projects/[id]/export?format=xlsx|csv` (SheetJS) con autenticación, autorización y validación de formato; PDF generado en cliente con jsPDF + AutoTable bajo demanda mediante server action `getProjectExportData` (evita cargar los datos en cada visita a la página). UI: botones "Export PDF" / "Export Excel" / "Export CSV" en la cabecera de `/dashboard/projects/[id]`, visibles solo con `reports.export`, con estado de generación y mensajes de error accesibles.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -2925,18 +2995,18 @@ Visualizar todas las tareas del proyecto según los permisos del usuario.
 ### Backend
 
 - [x] Consulta paginada
-- [ ] Búsqueda
+- [x] Búsqueda
 - [x] Ordenamiento
 - [x] Filtros
-- [ ] Conteo total
+- [x] Conteo total
 
 ### Frontend
 
 - [x] DataTable
-- [ ] Búsqueda rápida
+- [x] Búsqueda rápida
 - [x] Filtros avanzados
-- [ ] Acciones masivas
-- [ ] Columnas configurables
+- [x] Acciones masivas
+- [x] Columnas configurables
 
 Filtros
 
@@ -2953,9 +3023,11 @@ Filtros
 - [ ] Permisos
 - [ ] Responsive
 
+Implementación: búsqueda server-side (título + descripción) y conteo total (`COUNT` con el mismo WHERE) cableados desde `TasksService.list`; `/dashboard/tasks` con estado en URL (search, status, priority, assignee, project, sort, order, page), búsqueda rápida debounced, filtros validados contra opciones oficiales, ordenamiento con whitelist `TASK_SORTABLE_COLUMNS`, acciones masivas (`bulkUpdateTaskStatus`: guard `tasks.update`, Zod `bulkUpdateTaskStatusSchema`, transición de estado validada por tarea y auditoría `changed_task_status` por tarea), columnas configurables vía toolbar del DataTable (selección/acciones no ocultables) y acciones rápidas por fila (View/Edit/Complete-Reopen/Archive). Permisos: `requirePermission("tasks.read")` + `projectScope` en capa de datos. QA en `docs/qa/historia-7.1-7.14-administracion-tareas-vista-lista.md`.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -2970,14 +3042,14 @@ Crear Tarea
 ### Backend
 
 - [x] Crear Server Action
-- [ ] Validar datos
-- [ ] Registrar auditoría
+- [x] Validar datos
+- [x] Registrar auditoría
 
 ### Frontend
 
 - [x] Formulario
 - [x] Validaciones Zod
-- [ ] Confirmación
+- [x] Confirmación
 
 Campos
 
@@ -2991,9 +3063,11 @@ Campos
 - Fecha límite
 - Horas estimadas
 
+Implementación: esquema Zod dedicado (`schemas/task.ts`) con enums de estado/prioridad, fechas `YYYY-MM-DD`, orden inicio≤fin y regla del PRD §80 (responsable obligatorio salvo Pending/Planned). `createTask` valida con Zod, estampa `created_by/updated_by` y audita en `activity_logs` (`created_task`). Selector de responsable con usuarios activos Developer/Intermediary (`UsersService.listAssigneeOptions`); confirmación de éxito en el modal con feedback accesible.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3007,22 +3081,24 @@ Editar Tarea
 
 ### Backend
 
-- [ ] Actualizar información
-- [ ] Registrar auditoría
+- [x] Actualizar información
+- [x] Registrar auditoría
 
 ### Frontend
 
 - [x] Formulario de edición
-- [ ] Historial de cambios
+- [x] Historial de cambios
 
 ### QA
 
 - [x] Validaciones
-- [ ] Auditoría
+- [x] Auditoría
+
+Implementación: `updateTask` obtiene el estado previo vía `TasksService.getById` (visibilidad en capa de datos), detecta campos cambiados (`TASK_AUDIT_FIELDS`), estampa `updated_by` y escribe eventos diferenciados: `updated_task` (diff old/new por campo), `updated_task_progress` y `changed_task_status`. Sin cambios reales no se escribe evento ("No changes to save."). El detalle de tarea (/dashboard/tasks/[id]) incorpora tarjeta "History" con `TasksService.getHistory` + `ActivityTimeline`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3036,17 +3112,19 @@ Eliminar / Archivar Tarea
 
 ### Backend
 
-- [ ] Eliminación lógica
-- [ ] Restauración
-- [ ] Auditoría
+- [x] Eliminación lógica
+- [x] Restauración
+- [x] Auditoría
 
 ### Frontend
 
 - [x] Confirm Dialog
 
+Implementación: borrado lógico (`is_active=0`, `deleted_at`) con `TasksService.archive` y restauración con `restore()`; acción `toggleTaskActive` protegida por `tasks.delete` con auditoría `archived_task`/`restored_task`. UI: acción Archive en la tabla y botón en el detalle (confirmación previa); vista "Archived" en /dashboard/tasks (`?view=archived`) con acción Restore para recuperar tareas archivadas.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3072,12 +3150,14 @@ Estados disponibles
 
 ### Backend
 
-- [ ] Validar transiciones
-- [ ] Registrar historial
+- [x] Validar transiciones
+- [x] Registrar historial
+
+Implementación: estados en inglés (Pending, Planned, In Progress, Blocked, In Review, QA, Completed, Cancelled) mapean 1:1 con la lista; "Archivada" se cubre con el flujo de archivo (borrado lógico), igual que en proyectos. Tabla `TASK_STATUS_TRANSITIONS` + helpers puros en `features/tasks/task-status.ts` (flujo PRD §56; Completed/Cancelled reabren a In Progress/Pending). Los cambios de estado validan la transición en servidor (`assertTaskStatusTransition`) y registran `changed_task_status` con old/new; los formularios de edición solo ofrecen los estados destino permitidos (`getAllowedTaskStatusOptions`). Pendiente para una iteración posterior: motivo obligatorio de bloqueo (PRD §80) y estados adicionales sin código (PRD §55).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3131,18 +3211,20 @@ Permitir dividir una tarea en múltiples subtareas.
 
 ### Frontend
 
-- [ ] Lista de subtareas
-- [ ] Checkbox
-- [ ] Reordenamiento
+- [x] Lista de subtareas
+- [x] Checkbox
+- [x] Reordenamiento
 
 ### QA
 
 - [ ] Cálculo correcto
 - [ ] Persistencia
 
+Implementación (UI): tarjeta Subtasks en `/dashboard/tasks/[id]` con lista, checkbox de completado y reordenamiento arriba/abajo accesible (`aria-label`); acción `moveSubtask` + `TasksService.moveSubtask` intercambian vecinos y renumeran la lista completa con visibilidad validada en capa de datos.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -3242,17 +3324,19 @@ Registrar
 
 ### Backend
 
-- [ ] Registro manual
+- [x] Registro manual
 - [x] Validaciones
 
 ### Frontend
 
 - [x] Formulario
-- [ ] Historial
+- [x] Historial
+
+Implementación: esquema Zod compartido `schemas/time-entry.ts` (fecha, HH:MM opcional, horas 0–24, orden inicio/fin), acciones `createTimeEntry`/`deleteTimeEntry` con guards `time-entries.create|delete`, auditoría (`created_time_entry`/`deleted_time_entry`) y revalidación de la página de la tarea. UI: tarjeta Time Tracking en `/dashboard/tasks/[id]` con formulario manual, total acumulado e historial con autor/horas/borrado.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3266,19 +3350,21 @@ Temporizador
 
 ### Funciones
 
-- [ ] Iniciar
-- [ ] Pausar
-- [ ] Reanudar
-- [ ] Finalizar
+- [x] Iniciar
+- [x] Pausar
+- [x] Reanudar
+- [x] Finalizar
 
 ### QA
 
 - [ ] Tiempo correcto
 - [ ] Persistencia
 
+Implementación: componente cliente `TaskTimer` en `/dashboard/tasks/[id]` con estado persistido en localStorage (`pwa-task-timer-v1`) para sobrevivir recargas/navegación; Finalizar calcula horas redondeadas y crea el time entry vía `createTimeEntry`. Un solo temporizador activo por usuario (avisa si corre en otra tarea).
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3321,14 +3407,16 @@ Vista Lista
 
 ### Funciones
 
-- [ ] Tabla
+- [x] Tabla
 - [x] Ordenamiento
 - [x] Filtros
-- [ ] Acciones rápidas
+- [x] Acciones rápidas
+
+Implementación: `/dashboard/tasks` como vista de lista completa (DataTable compartido con paginación manual real, búsqueda, filtros y ordenamiento en URL) reutilizada por `/dashboard/projects/[id]/tasks` con proyecto fijo; acciones rápidas por fila: View (detalle), Edit (modal), Complete/Reopen (toggle con auditoría) y Archive (confirmación, gated `tasks.delete`). Columnas de Vista Lista según PRD §75: Task, Project, Assignee, Status, Priority, Progress, Est. Hours y Due Date. QA en `docs/qa/historia-7.1-7.14-administracion-tareas-vista-lista.md`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3384,17 +3472,19 @@ Etiquetas
 
 ### Backend
 
-- [ ] CRUD etiquetas
+- [x] CRUD etiquetas
 
 ### Frontend
 
-- [ ] Selector
-- [ ] Colores
+- [x] Selector
+- [x] Colores
 - [x] Filtros
+
+Implementación: CRUD de etiquetas en `/dashboard/tags` con paleta compartida (`TAG_COLOR_OPTIONS`, esquema Zod) y auditoría. Asignación a tareas (Historia 7.17): `TagsService.listByTask/setTaskTags` (reemplazo transaccional), acción `updateTaskTags` con guard `tasks.update` y auditoría `updated_task_tags`; tarjeta Tags en `/dashboard/tasks/[id]` reutilizando `TagSelector`/`TagChip` (solo lectura sin permiso).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7260,7 +7350,7 @@ P1
 
 Estado
 
-Done
+In Progress
 
 Dependencias
 
@@ -7278,16 +7368,16 @@ Implementar un servicio unificado de auditoría para toda la plataforma.
 
 ### Backend
 
-- [ ] Servicio central de auditoría
-- [ ] Registro automático
-- [ ] API de consulta
+- [x] Servicio central de auditoría
+- [x] Registro automático
+- [x] API de consulta
 - [ ] Optimización de consultas
 
 ### Frontend
 
-- [ ] Panel de auditoría
+- [x] Panel de auditoría
 - [x] Filtros
-- [ ] Búsqueda
+- [x] Búsqueda
 - [ ] Exportación
 
 ### QA
@@ -7296,9 +7386,11 @@ Implementar un servicio unificado de auditoría para toda la plataforma.
 - [ ] Rendimiento
 - [ ] Permisos
 
+Implementación: `ActivityService` (escritura centralizada) + `ActivityLogService.list` (filtros usuario/entidad/búsqueda, orden y paginación server-side); panel `/dashboard/activity` con vista tabla (TanStack Table) y timeline, protegido por `users.read`. Exportación y QA pendientes.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7312,20 +7404,22 @@ Registro de Acciones
 
 Registrar automáticamente
 
-- [ ] Inicio de sesión
-- [ ] Cierre de sesión
+- [x] Inicio de sesión
+- [x] Cierre de sesión
 - [ ] Intentos fallidos
-- [ ] Creación
-- [ ] Actualización
-- [ ] Eliminación lógica
-- [ ] Restauración
+- [x] Creación
+- [x] Actualización
+- [x] Eliminación lógica
+- [x] Restauración
 - [ ] Exportaciones
 - [ ] Descargas
-- [ ] Subidas de archivos
+- [x] Subidas de archivos
+
+Implementación: `logged_in`/`logged_out`/`requested_password_reset`/`reset_password` (`actions/auth.ts`), eventos `created_*`/`updated_*`/`archived_*`/`restored_*` por módulo, `uploaded_file`/`deleted_file` (`actions/files.ts`). Pendientes: intentos fallidos, exportaciones y descargas.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7347,9 +7441,11 @@ Registrar
 - Archivado
 - Restauración
 
+Implementación parcial: `created_project` registrado (`actions/projects.ts`); actualización, cambios de estado y archivado/restauración de proyectos pendientes.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7416,9 +7512,11 @@ Registrar
 - Archivo restaurado
 - Cambio de permisos
 
+Implementación parcial: `uploaded_file`/`deleted_file` registrados con entidad normalizada y metadatos (`actions/files.ts`); descarga, versiones y permisos pendientes.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7440,9 +7538,11 @@ Registrar
 - Activación
 - Desactivación
 
+Implementación mayoritaria: `logged_in`/`logged_out` (`actions/auth.ts`), `changed_password` y actualización de perfil (`actions/profile.ts`), cambio de rol y activación/desactivación con diff (`actions/users.ts`). Cambio de correo pendiente de evento dedicado.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7495,9 +7595,11 @@ Permitir filtrar por
 - Proyecto
 - Cliente
 
+Implementación parcial: filtros por usuario, entidad y búsqueda de acción en `/dashboard/activity`; fecha, proyecto y cliente pendientes.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7518,9 +7620,11 @@ Buscar registros por
 - IP
 - Texto
 
+Implementación parcial: búsqueda por acción/entidad (`ActivityLogService.list`) y filtro de usuario; búsqueda por proyecto, recurso e IP pendiente.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
