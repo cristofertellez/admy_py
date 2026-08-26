@@ -5,6 +5,7 @@ export {
 } from "./clients.types";
 export type {
   AssignedIntermediary,
+  ClientAssignmentCandidate,
   ClientDetailData,
   ClientHistoryCategory,
   ClientHistoryFilters,

@@ -1,6 +1,9 @@
 export { ActivityLogService } from "./activity.service";
 export {
+  ACCESS_AUDIT_ACTIONS,
   formatActivityUserName,
+  getActivityEntityHref,
+  getActivityEventDetail,
   getActivityUserInitials,
 } from "./activity.types";
 export type {

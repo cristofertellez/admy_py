@@ -15,6 +15,14 @@ export const updateUserSchema = z.object({
   role_id: z.string().uuid("A valid role is required"),
 });
 
+export const intermediarySchema = z.object({
+  first_name: z.string().trim().min(1, "First name is required"),
+  last_name: z.string().trim().min(1, "Last name is required"),
+  email: z.string().trim().toLowerCase().email("Invalid email address"),
+});
+
+export type IntermediaryInput = z.infer<typeof intermediarySchema>;
+
 export const updateProfileSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required"),
   last_name: z.string().trim().min(1, "Last name is required"),

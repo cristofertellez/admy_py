@@ -40,4 +40,14 @@ export const clientSchema = z.object({
   intermediary_id: z.string().uuid("Invalid intermediary").optional().nullable(),
 });
 
+export const assignClientsToIntermediarySchema = z.object({
+  intermediary_id: z.string().uuid("Invalid intermediary"),
+  client_ids: z
+    .array(z.string().uuid("Invalid client"))
+    .min(1, "Select at least one client")
+    .max(200, "Select at most 200 clients"),
+});
+
+export type AssignClientsToIntermediaryInput = z.infer<typeof assignClientsToIntermediarySchema>;
+
 export type ClientInput = z.infer<typeof clientSchema>;

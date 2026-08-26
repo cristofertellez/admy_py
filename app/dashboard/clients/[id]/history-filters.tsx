@@ -19,9 +19,19 @@ interface HistoryFiltersProps {
   initialSearch: string;
   category: string;
   onNavigate: (overrides: Record<string, string | undefined>) => void;
+  // Entities with their own event taxonomy pass their options and an id prefix;
+  // defaults keep the client timeline behaviour untouched.
+  idPrefix?: string;
+  categoryOptions?: Array<{ value: string; label: string }>;
 }
 
-export function HistoryFilters({ initialSearch, category, onNavigate }: HistoryFiltersProps) {
+export function HistoryFilters({
+  initialSearch,
+  category,
+  onNavigate,
+  idPrefix = "client-history",
+  categoryOptions = CATEGORY_OPTIONS,
+}: HistoryFiltersProps) {
   const [searchInput, setSearchInput] = useState(initialSearch);
   const debouncedSearch = useDebounce(searchInput, 400);
 
@@ -34,13 +44,13 @@ export function HistoryFilters({ initialSearch, category, onNavigate }: HistoryF
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
       <div className="flex-1">
         <label
-          htmlFor="client-history-search"
+          htmlFor={`${idPrefix}-search`}
           className="mb-1.5 block text-body-sm font-medium text-body-strong"
         >
           Search
         </label>
         <input
-          id="client-history-search"
+          id={`${idPrefix}-search`}
           type="search"
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
@@ -50,18 +60,18 @@ export function HistoryFilters({ initialSearch, category, onNavigate }: HistoryF
       </div>
       <div className="w-full sm:w-52">
         <label
-          htmlFor="client-history-category"
+          htmlFor={`${idPrefix}-category`}
           className="mb-1.5 block text-body-sm font-medium text-body-strong"
         >
           Event type
         </label>
         <select
-          id="client-history-category"
+          id={`${idPrefix}-category`}
           value={category}
           onChange={(event) => onNavigate({ category: event.target.value || undefined, page: undefined })}
           className={controlClasses}
         >
-          {CATEGORY_OPTIONS.map((option) => (
+          {categoryOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

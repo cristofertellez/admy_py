@@ -1,5 +1,6 @@
 import { assertTaskVisible, projectScope, requireScopedUser } from "@/lib/auth-scope";
 import { newId, query, queryOne } from "@/lib/turso/client";
+import { hasFullAccess } from "@/lib/roles";
 
 interface TimeEntryAuthorColumns {
   author_first_name: string | null;
@@ -12,6 +13,16 @@ interface TimeEntryTaskColumns {
 }
 
 export class TimeEntriesService {
+  static async getById(id: string) {
+    const entry = await queryOne<Record<string, unknown>>(
+      "SELECT * FROM time_entries WHERE id = ?",
+      [id],
+    );
+    if (!entry) throw new Error("Time entry not found.");
+    await assertTaskVisible(entry.task_id as string);
+    return entry;
+  }
+
   static async listByTask(taskId: string) {
     const scope = await projectScope("t.project_id");
     const rows = await query<Record<string, unknown> & TimeEntryAuthorColumns>(
@@ -116,7 +127,7 @@ export class TimeEntriesService {
     );
     if (!existing) return true;
 
-    if (user.role !== "Developer" && existing.user_id !== user.id) {
+    if (!hasFullAccess(user.role) && existing.user_id !== user.id) {
       throw new Error("You can only delete your own time entries.");
     }
 

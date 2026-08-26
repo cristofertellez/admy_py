@@ -7,9 +7,10 @@ import { canAccessRoute } from "@/lib/routes";
 
 interface DashboardSidebarProps {
   role?: string;
+  userId?: string;
 }
 
-export function DashboardSidebar({ role }: DashboardSidebarProps) {
+export function DashboardSidebar({ role, userId }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -81,6 +82,11 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
             <NavItem href="/dashboard/reports" pathname={pathname}>
               Reports
             </NavItem>
+            {role === "Intermediary" && userId && (
+              <NavItem href={`/dashboard/intermediaries/${userId}`} pathname={pathname}>
+                My Report
+              </NavItem>
+            )}
             <NavItem href="/dashboard/notifications" pathname={pathname}>
               Notifications
             </NavItem>

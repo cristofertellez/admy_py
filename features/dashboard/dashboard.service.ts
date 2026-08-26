@@ -1,6 +1,7 @@
 import { countRows, query } from "@/lib/turso/client";
 import { clientScope, projectScope, requireScopedUser } from "@/lib/auth-scope";
 import type { SessionProfile } from "@/lib/auth";
+import { hasFullAccess } from "@/lib/roles";
 
 export interface DashboardStats {
   totalClients: number;
@@ -54,11 +55,57 @@ export interface AdminOverview {
   platform: DashboardStats;
 }
 
+const FINALIZED_PROJECT_STATUSES = "('Completed', 'Cancelled', 'Archived')";
+
+export interface IntermediaryPanelStats {
+  totalClients: number;
+  activeClients: number;
+  activeProjects: number;
+  completedProjects: number;
+  dueSoonProjects: number;
+  pendingTasks: number;
+}
+
+export interface DueSoonProject {
+  id: string;
+  name: string;
+  status: string;
+  completion_percentage: number | null;
+  estimated_end_date: string;
+  client_name: string;
+}
+
+export interface PendingTaskSummary {
+  id: string;
+  title: string;
+  priority: string;
+  estimated_end: string | null;
+  project_name: string;
+}
+
+export interface PanelComment {
+  id: string;
+  message: string;
+  created_at: string;
+  author_first_name: string | null;
+  author_last_name: string | null;
+  context_type: "client" | "project";
+  context_id: string;
+  context_title: string;
+}
+
+export interface IntermediaryPanelData {
+  stats: IntermediaryPanelStats;
+  dueSoonProjects: DueSoonProject[];
+  pendingTasks: PendingTaskSummary[];
+  recentComments: PanelComment[];
+}
+
 export class DashboardService {
   static async getStats(user?: SessionProfile): Promise<DashboardStats> {
     const actor = user ?? (await requireScopedUser());
 
-    if (actor.role === "Developer") {
+    if (hasFullAccess(actor.role)) {
       return DashboardService.getDeveloperStats();
     }
 
@@ -213,6 +260,143 @@ export class DashboardService {
       totalEstimatedHours,
       totalWorkedHours,
       averageProgress,
+    };
+  }
+
+  /**
+   * Panel exclusivo del rol Intermediary (Historia 5.6). Todos los conteos y
+   * listados se resuelven con los fragmentos de alcance (clientScope /
+   * projectScope), de modo que la autorización ocurre en la capa de datos.
+   */
+  static async getIntermediaryPanel(actor: SessionProfile): Promise<IntermediaryPanelData> {
+    if (actor.role !== "Intermediary") {
+      throw new Error("Only intermediaries can access this panel.");
+    }
+
+    const clientClause = await clientScope("id");
+    const projectClause = await projectScope("p.id");
+    const taskClause = await projectScope("t.project_id");
+    const projectCommentClause = await projectScope("pc.project_id");
+
+    const today = new Date().toISOString().slice(0, 10);
+    const dueSoonLimit = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const [
+      totalClients,
+      activeClients,
+      activeProjects,
+      completedProjects,
+      pendingTasksCount,
+      dueSoonProjects,
+      pendingTaskRows,
+      clientCommentRows,
+      projectCommentRows,
+    ] = await Promise.all([
+      countRows(
+        `SELECT COUNT(*) AS total FROM clients WHERE deleted_at IS NULL AND ${clientClause.sql}`,
+        clientClause.args,
+      ),
+      countRows(
+        `SELECT COUNT(*) AS total FROM clients WHERE deleted_at IS NULL AND is_active = 1 AND ${clientClause.sql}`,
+        clientClause.args,
+      ),
+      countRows(
+        `SELECT COUNT(*) AS total FROM projects p
+         WHERE p.deleted_at IS NULL AND p.is_active = 1 AND p.status NOT IN (${FINALIZED_PROJECT_STATUSES})
+           AND ${projectClause.sql}`,
+        projectClause.args,
+      ),
+      countRows(
+        `SELECT COUNT(*) AS total FROM projects p
+         WHERE p.deleted_at IS NULL AND p.status = 'Completed' AND ${projectClause.sql}`,
+        projectClause.args,
+      ),
+      countRows(
+        `SELECT COUNT(*) AS total FROM tasks t
+         WHERE t.deleted_at IS NULL AND t.status = 'Pending' AND ${taskClause.sql}`,
+        taskClause.args,
+      ),
+      query<DueSoonProject>(
+        `SELECT p.id, p.name, p.status, p.completion_percentage, p.estimated_end_date,
+                c.company_name AS client_name
+         FROM projects p
+         JOIN clients c ON c.id = p.client_id
+         WHERE p.deleted_at IS NULL AND c.deleted_at IS NULL AND c.is_active = 1
+           AND p.status NOT IN (${FINALIZED_PROJECT_STATUSES})
+           AND p.estimated_end_date IS NOT NULL AND p.estimated_end_date >= ? AND p.estimated_end_date <= ?
+           AND ${projectClause.sql}
+         ORDER BY p.estimated_end_date ASC
+         LIMIT 6`,
+        [today, dueSoonLimit, ...projectClause.args],
+      ),
+      query<PendingTaskSummary>(
+        `SELECT t.id, t.title, t.priority, t.estimated_end, p.name AS project_name
+         FROM tasks t
+         JOIN projects p ON p.id = t.project_id
+         JOIN clients c ON c.id = p.client_id
+         WHERE t.deleted_at IS NULL AND t.status = 'Pending'
+           AND p.deleted_at IS NULL AND c.deleted_at IS NULL AND c.is_active = 1
+           AND ${taskClause.sql}
+         ORDER BY (t.estimated_end IS NULL) ASC, t.estimated_end ASC
+         LIMIT 6`,
+        [...taskClause.args],
+      ),
+      query<Omit<PanelComment, "context_type"> & { context_type: string }>(
+        `SELECT cc.id, cc.message, cc.created_at,
+                u.first_name AS author_first_name, u.last_name AS author_last_name,
+                'client' AS context_type, c.id AS context_id, c.company_name AS context_title
+         FROM client_comments cc
+         JOIN clients c ON c.id = cc.client_id
+         LEFT JOIN users u ON u.id = cc.user_id
+         WHERE cc.deleted_at IS NULL AND cc.is_active = 1
+           AND c.deleted_at IS NULL AND c.is_active = 1
+           AND ${clientClause.sql}
+         ORDER BY cc.created_at DESC
+         LIMIT 6`,
+        clientClause.args,
+      ),
+      query<Omit<PanelComment, "context_type"> & { context_type: string }>(
+        `SELECT pc.id, pc.message, pc.created_at,
+                u.first_name AS author_first_name, u.last_name AS author_last_name,
+                'project' AS context_type, p.id AS context_id, p.name AS context_title
+         FROM project_comments pc
+         JOIN projects p ON p.id = pc.project_id
+         JOIN clients c ON c.id = p.client_id
+         LEFT JOIN users u ON u.id = pc.user_id
+         WHERE pc.deleted_at IS NULL AND pc.is_active = 1
+           AND p.deleted_at IS NULL AND c.deleted_at IS NULL AND c.is_active = 1
+           AND ${projectCommentClause.sql}
+         ORDER BY pc.created_at DESC
+         LIMIT 6`,
+        projectCommentClause.args,
+      ),
+    ]);
+
+    const recentComments: PanelComment[] = [
+      ...clientCommentRows,
+      ...projectCommentRows,
+    ]
+      .map((row) => ({
+        ...row,
+        context_type: row.context_type === "client" ? ("client" as const) : ("project" as const),
+      }))
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+      .slice(0, 6);
+
+    return {
+      stats: {
+        totalClients,
+        activeClients,
+        activeProjects,
+        completedProjects,
+        dueSoonProjects: dueSoonProjects.length,
+        pendingTasks: pendingTasksCount,
+      },
+      dueSoonProjects,
+      pendingTasks: pendingTaskRows,
+      recentComments,
     };
   }
 

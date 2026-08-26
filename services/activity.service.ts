@@ -1,4 +1,4 @@
-import { newId, query } from "@/lib/turso/client";
+import { newId, query, queryOne } from "@/lib/turso/client";
 
 export interface ActivityLogEntry {
   user_id: string;
@@ -10,6 +10,8 @@ export interface ActivityLogEntry {
   ip_address?: string;
   user_agent?: string;
 }
+
+const ACCESS_EVENT_DEDUPE_SECONDS = 60;
 
 export class ActivityService {
   static async log(entry: ActivityLogEntry) {
@@ -31,6 +33,31 @@ export class ActivityService {
       );
     } catch (err) {
       console.error("ActivityService: failed to write log:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  // Access events (views/downloads) repeat on every refresh or prefetch; they are
+  // collapsed per user/action/entity within a short window to keep the audit
+  // trail readable without losing traceability of the first access.
+  static async logAccessOnce(entry: ActivityLogEntry, windowSeconds = ACCESS_EVENT_DEDUPE_SECONDS) {
+    try {
+      const recent = await queryOne<{ ok: number }>(
+        `SELECT 1 AS ok FROM activity_logs
+         WHERE user_id = ? AND action = ? AND (? IS NULL OR entity_id = ?) AND created_at >= ?
+         LIMIT 1`,
+        [
+          entry.user_id,
+          entry.action,
+          entry.entity_id || null,
+          entry.entity_id || null,
+          new Date(Date.now() - windowSeconds * 1000).toISOString(),
+        ],
+      );
+      if (recent) return;
+
+      await this.log(entry);
+    } catch (err) {
+      console.error("ActivityService: failed to write access log:", err instanceof Error ? err.message : err);
     }
   }
 }

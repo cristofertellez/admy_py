@@ -20,6 +20,8 @@ export interface TaskFilters {
   status?: TaskStatus;
   priority?: Priority;
   parentTaskId?: string;
+  // When true, lists soft-deleted (archived) tasks instead of active ones.
+  archived?: boolean;
   page?: number;
   pageSize?: number;
   sortBy?: string;

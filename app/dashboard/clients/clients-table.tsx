@@ -46,6 +46,8 @@ interface ClientsTableProps {
   initialFilters: { search: string; status: string };
   pageIndex: number;
   pageSize: number;
+  canCreate: boolean;
+  canUpdate: boolean;
 }
 
 export function ClientsTable({
@@ -54,6 +56,8 @@ export function ClientsTable({
   initialFilters,
   pageIndex,
   pageSize,
+  canCreate,
+  canUpdate,
 }: ClientsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -102,32 +106,36 @@ export function ClientsTable({
 
   const actionColumns: ColumnDef<ClientWithRelations>[] = [
     ...columns,
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/dashboard/clients/${row.original.id}`}
-            className="text-body-sm text-primary hover:underline"
-          >
-            View
-          </Link>
-          <button
-            onClick={() => setEditingClient(row.original)}
-            className="text-body-sm text-primary hover:underline"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => handleToggle(row.original)}
-            className="text-body-sm text-muted hover:text-body-strong"
-          >
-            {row.original.is_active ? "Archive" : "Restore"}
-          </button>
-        </div>
-      ),
-    },
+    ...(canUpdate
+      ? [
+          {
+            id: "actions",
+            header: "Actions",
+            cell: ({ row }: { row: { original: ClientWithRelations } }) => (
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/dashboard/clients/${row.original.id}`}
+                  className="text-body-sm text-primary hover:underline"
+                >
+                  View
+                </Link>
+                <button
+                  onClick={() => setEditingClient(row.original)}
+                  className="text-body-sm text-primary hover:underline"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleToggle(row.original)}
+                  className="text-body-sm text-muted hover:text-body-strong"
+                >
+                  {row.original.is_active ? "Archive" : "Restore"}
+                </button>
+              </div>
+            ),
+          } as ColumnDef<ClientWithRelations>,
+        ]
+      : []),
   ];
 
   return (
@@ -160,7 +168,7 @@ export function ClientsTable({
             <option value="inactive">Inactive</option>
           </select>
         </div>
-        <Button onClick={() => setShowCreate(true)}>Add Client</Button>
+        {canCreate && <Button onClick={() => setShowCreate(true)}>Add Client</Button>}
       </div>
 
       <DataTable

@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { hasFullAccess } from "@/lib/roles";
 import { DashboardService } from "@/features/dashboard";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
 import { ReportsCharts } from "./reports-charts";
@@ -11,7 +12,7 @@ export default async function ReportsPage() {
   const user = await requireAuth();
   const stats = await DashboardService.getStats(user);
 
-  const isDeveloper = user.role === "Developer";
+  const isDeveloper = hasFullAccess(user.role);
   const totalIntermediaries = isDeveloper
     ? await countRows(`SELECT COUNT(*) AS total FROM users WHERE is_active = 1`)
     : 0;

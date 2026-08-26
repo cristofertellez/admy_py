@@ -32,8 +32,31 @@ export const PROJECT_STATUSES = {
   ARCHIVED: "Archived",
 } as const;
 
+// Allowed project status transitions (Historia 6.4). The workflow follows the
+// PRD pipeline: Proposed → Pending → Planning → Design → Development → QA →
+// In Review → Corrections / Ready for Delivery → Delivered → Completed.
+// Suspended pauses active work; Cancelled and Completed are terminal states
+// (archiving is handled by the dedicated archive flow, Historia 6.11).
+export const PROJECT_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+  Proposed: ["Pending", "Planning", "Design", "Development", "QA", "Cancelled"],
+  Pending: ["Planning", "Design", "Development", "Cancelled"],
+  Planning: ["Design", "Development", "Cancelled"],
+  Design: ["Development", "Cancelled"],
+  Development: ["QA", "In Review", "Suspended", "Cancelled"],
+  QA: ["In Review", "Corrections", "Development", "Suspended", "Cancelled"],
+  "In Review": ["Corrections", "Ready for Delivery", "Development", "Cancelled"],
+  Corrections: ["QA", "In Review", "Development", "Cancelled"],
+  "Ready for Delivery": ["Delivered", "Corrections", "Cancelled"],
+  Delivered: ["Completed", "Corrections"],
+  Completed: [],
+  Suspended: ["Planning", "Development", "QA", "In Review", "Cancelled"],
+  Cancelled: [],
+  Archived: [],
+};
+
 export const TASK_STATUSES = {
   PENDING: "Pending",
+  PLANNED: "Planned",
   IN_PROGRESS: "In Progress",
   BLOCKED: "Blocked",
   IN_REVIEW: "In Review",
@@ -41,6 +64,23 @@ export const TASK_STATUSES = {
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
 } as const;
+
+// Allowed task status transitions (Historia 7.5). The workflow follows the PRD
+// pipeline (§56): Pending → Planned → In Progress → In Review → QA → Completed.
+// Blocked can interrupt active work at any point; Cancelled is reachable while
+// the task has not been finished. Completed tasks may be reopened by staff and
+// cancelled tasks return to Pending (both existing quick-actions); archiving is
+// handled by the dedicated archive flow (Historia 7.4), not by a status change.
+export const TASK_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+  Pending: ["Planned", "In Progress", "Blocked", "Cancelled"],
+  Planned: ["Pending", "In Progress", "Blocked", "Cancelled"],
+  "In Progress": ["Blocked", "In Review", "QA", "Completed", "Cancelled"],
+  Blocked: ["Pending", "In Progress", "Cancelled"],
+  "In Review": ["QA", "Completed", "In Progress", "Cancelled"],
+  QA: ["Completed", "In Review", "In Progress", "Cancelled"],
+  Completed: ["In Progress"],
+  Cancelled: ["Pending"],
+};
 
 export const PRIORITIES = {
   VERY_LOW: "Very Low",
@@ -50,6 +90,45 @@ export const PRIORITIES = {
   CRITICAL: "Critical",
   URGENT: "Urgent",
 } as const;
+
+export const PROJECT_PRIORITY_OPTIONS = Object.values(PRIORITIES).map((value) => ({
+  value,
+  label: value,
+}));
+
+export const PROJECT_STATUS_OPTIONS = Object.values(PROJECT_STATUSES).map((value) => ({
+  value,
+  label: value,
+}));
+
+export const TASK_STATUS_OPTIONS = Object.values(TASK_STATUSES).map((value) => ({
+  value,
+  label: value,
+}));
+
+export const TASK_PRIORITY_OPTIONS = Object.values(PRIORITIES).map((value) => ({
+  value,
+  label: value,
+}));
+
+// Tag color palette (Historia 6.10): shared by the tags admin page and the
+// project tag selector so every tag uses one of the approved colors.
+export const TAG_COLOR_OPTIONS = [
+  "#3B82F6",
+  "#EF4444",
+  "#22C55E",
+  "#F59E0B",
+  "#8B5CF6",
+  "#EC4899",
+  "#06B6D4",
+  "#F97316",
+  "#6366F1",
+  "#14B8A6",
+] as const;
+
+export const DEFAULT_TAG_COLOR = TAG_COLOR_OPTIONS[0];
+
+export const MAX_TAGS_PER_PROJECT = 20;
 
 export const FILE_TYPES_ALLOWED = [
   "application/pdf",

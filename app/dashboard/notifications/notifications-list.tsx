@@ -4,6 +4,7 @@ import { markAsRead, markAllAsRead } from "@/actions/notifications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/shared/card";
 import { Badge } from "@/components/shared/badge";
+import Link from "next/link";
 import { useTransition } from "react";
 
 interface NotificationRow {
@@ -16,6 +17,39 @@ interface NotificationRow {
   entity_type: string | null;
   entity_id: string | null;
   sender: { first_name: string; last_name: string } | null;
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  project_updated: "Project updated",
+  comment_created: "New comment",
+  task_created: "New task",
+  project_completed: "Project completed",
+  project_delayed: "Project delayed",
+  deadline_upcoming: "Upcoming deadline",
+};
+
+const TYPE_VARIANTS: Record<string, "default" | "success" | "error" | "warning"> = {
+  project_updated: "default",
+  comment_created: "default",
+  task_created: "default",
+  project_completed: "success",
+  project_delayed: "error",
+  deadline_upcoming: "warning",
+};
+
+function getEntityHref(entityType: string | null, entityId: string | null): string | null {
+  if (!entityType || !entityId) return null;
+
+  switch (entityType) {
+    case "Project":
+      return `/dashboard/projects/${entityId}`;
+    case "Task":
+      return `/dashboard/tasks/${entityId}`;
+    case "Milestone":
+      return "/dashboard/milestones";
+    default:
+      return null;
+  }
 }
 
 export function NotificationsList({
@@ -56,38 +90,48 @@ export function NotificationsList({
       )}
 
       <div className="space-y-2">
-        {notifications.map((n) => (
-          <Card key={n.id} className={n.is_read ? "opacity-70" : ""}>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {!n.is_read && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                    <span className="text-body-sm font-medium text-body-strong">{n.title}</span>
-                    <Badge>{n.type}</Badge>
+        {notifications.map((n) => {
+          const href = getEntityHref(n.entity_type, n.entity_id);
+          return (
+            <Card key={n.id} className={n.is_read ? "opacity-70" : ""}>
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!n.is_read && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />}
+                      <span className="text-body-sm font-medium text-body-strong">{n.title}</span>
+                      <Badge variant={TYPE_VARIANTS[n.type] ?? "default"}>
+                        {TYPE_LABELS[n.type] ?? n.type}
+                      </Badge>
+                    </div>
+                    {n.message && <p className="mt-1 text-body-sm text-muted">{n.message}</p>}
+                    <div className="mt-1 flex items-center gap-2 text-caption text-muted">
+                      <span>{new Date(n.created_at).toLocaleDateString()}</span>
+                      {n.sender && (
+                        <span>
+                          by {n.sender.first_name} {n.sender.last_name}
+                        </span>
+                      )}
+                      {href && (
+                        <Link href={href} className="text-primary hover:underline">
+                          View {n.entity_type?.toLowerCase()}
+                        </Link>
+                      )}
+                    </div>
                   </div>
-                  {n.message && <p className="mt-1 text-body-sm text-muted">{n.message}</p>}
-                  <div className="mt-1 flex items-center gap-2 text-caption text-muted">
-                    <span>{new Date(n.created_at).toLocaleDateString()}</span>
-                    {n.sender && (
-                      <span>
-                        by {n.sender.first_name} {n.sender.last_name}
-                      </span>
-                    )}
-                  </div>
+                  {!n.is_read && (
+                    <button
+                      onClick={() => handleMarkRead(n.id)}
+                      className="shrink-0 text-caption text-primary hover:underline"
+                    >
+                      Mark read
+                    </button>
+                  )}
                 </div>
-                {!n.is_read && (
-                  <button
-                    onClick={() => handleMarkRead(n.id)}
-                    className="shrink-0 text-caption text-primary hover:underline"
-                  >
-                    Mark read
-                  </button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

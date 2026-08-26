@@ -1,9 +1,12 @@
 import { Badge } from "@/components/shared/badge";
 import {
   formatActivityUserName,
+  getActivityEntityHref,
+  getActivityEventDetail,
   getActivityUserInitials,
   type ActivityLog,
 } from "@/features/activity";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface TimelineGroup {
@@ -48,6 +51,25 @@ interface ActivityTimelineProps {
   pageIndex: number;
   pageSize: number;
   onPageChange?: (nextPageIndex: number) => void;
+}
+
+function TimelineEventDetail({ log }: { log: ActivityLog }) {
+  const detail = getActivityEventDetail(log);
+  if (!detail) return null;
+
+  const href = getActivityEntityHref(log.entity, log.entity_id);
+
+  return (
+    <p className="mt-1 text-body-sm text-muted">
+      {href ? (
+        <Link href={href} className="text-primary hover:underline">
+          {detail}
+        </Link>
+      ) : (
+        detail
+      )}
+    </p>
+  );
 }
 
 export function ActivityTimeline({ logs, total, pageIndex, pageSize, onPageChange }: ActivityTimelineProps) {
@@ -96,6 +118,7 @@ export function ActivityTimeline({ logs, total, pageIndex, pageSize, onPageChang
                     </time>
                   </div>
                   <p className="mt-2 text-body-sm text-body">{log.action.replace(/_/g, " ")}</p>
+                  <TimelineEventDetail log={log} />
                 </article>
               </li>
             ))}

@@ -1,15 +1,20 @@
 "use client";
 
-import { createSubtask, updateTask } from "@/actions/tasks";
+import { createSubtask, updateTask, moveSubtask, toggleTaskCompletion, toggleTaskActive } from "@/actions/tasks";
 import { createChecklistItem, toggleChecklistItem, deleteChecklistItem } from "@/actions/checklists";
+import { updateTaskTags } from "@/actions/tags";
 import { Badge } from "@/components/shared/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
-import { FormField, FormSelect, FormTextarea } from "@/components/forms";
+import { FormField, FormSelect, FormTextarea, TagSelector } from "@/components/forms";
+import { TagChip } from "@/components/shared/tag-chip";
+import { TimeTracking, type TimeEntryRow } from "./time-tracking";
 import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createTaskCommentAction } from "@/actions/comments";
-import { toggleTaskCompletion } from "@/actions/tasks";
 import { useQueuedFormAction } from "@/hooks/use-queued-form-action";
+import { getAllowedTaskStatusOptions } from "@/features/tasks/task-status";
+import { TASK_PRIORITY_OPTIONS, TASK_STATUS_OPTIONS } from "@/constants";
 
 interface SubtaskRow {
   id: string; title: string; status: string; priority: string;
@@ -22,6 +27,12 @@ interface CommentRow {
 interface ChecklistRow {
   id: string; title: string; is_completed: boolean; sort_order: number;
 }
+interface TagRow {
+  id: string; name: string; color: string | null;
+}
+interface AssigneeOption {
+  id: string; first_name: string; last_name: string; role: string;
+}
 
 interface Props {
   task: Record<string, unknown>;
@@ -30,43 +41,67 @@ interface Props {
   availableTasks: Record<string, unknown>[];
   comments: CommentRow[];
   checklists: ChecklistRow[];
+  timeEntries: TimeEntryRow[];
+  tags: TagRow[];
+  taskTags: TagRow[];
+  assigneeOptions?: AssigneeOption[];
   userId?: string;
+  canCreateTasks?: boolean;
+  canUpdateTasks?: boolean;
+  canDeleteTasks?: boolean;
+  canCreateTimeEntries?: boolean;
+  canDeleteTimeEntries?: boolean;
 }
 
 const statusColors: Record<string, "success" | "error" | "warning" | "default"> = {
-  Completed: "success", Blocked: "error", "In Progress": "warning", "In Review": "default", QA: "default",
+  Completed: "success", Blocked: "error", Cancelled: "error", "In Progress": "warning", "In Review": "default", QA: "default",
 };
-const statusOpts = [
-  { value: "Pending", label: "Pending" }, { value: "In Progress", label: "In Progress" },
-  { value: "Blocked", label: "Blocked" }, { value: "In Review", label: "In Review" },
-  { value: "QA", label: "QA" }, { value: "Completed", label: "Completed" },
-];
-const priorityOpts = [
-  { value: "Low", label: "Low" }, { value: "Medium", label: "Medium" },
-  { value: "High", label: "High" }, { value: "Critical", label: "Critical" },
-];
 
-export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, availableTasks, comments, checklists }: Props) {
-  const [subtasks] = useState(initialSubtasks);
+export function TaskDetail({
+  task,
+  subtasks,
+  dependencies,
+  availableTasks,
+  comments,
+  checklists,
+  timeEntries,
+  tags,
+  taskTags,
+  assigneeOptions = [],
+  canCreateTasks = true,
+  canUpdateTasks = true,
+  canDeleteTasks = false,
+  canCreateTimeEntries = false,
+  canDeleteTimeEntries = false,
+}: Props) {
   const [showCreateSubtask, setShowCreateSubtask] = useState(false);
   const [editingSubtask, setEditingSubtask] = useState<SubtaskRow | null>(null);
   const [showEditTask, setShowEditTask] = useState(false);
 
   const completedCount = subtasks.filter((s) => s.status === "Completed").length;
   const checklistCompleted = checklists.filter((c) => c.is_completed).length;
+  const assigneeOpts = [
+    { value: "", label: "Unassigned" },
+    ...assigneeOptions.map((a) => ({ value: a.id, label: `${a.first_name} ${a.last_name} (${a.role})` })),
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <CompleteButton taskId={task.id as string} isCompleted={task.status === "Completed"} />
-        <Button variant="secondary" onClick={() => setShowEditTask(true)}>Edit Task</Button>
-      </div>
+      {canUpdateTasks && (
+        <div className="flex items-center gap-4">
+          <CompleteButton taskId={task.id as string} isCompleted={task.status === "Completed"} />
+          <Button variant="secondary" onClick={() => setShowEditTask(true)}>Edit Task</Button>
+          {canDeleteTasks && (
+            <ArchiveButton taskId={task.id as string} taskTitle={task.title as string} />
+          )}
+        </div>
+      )}
 
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Subtasks ({completedCount}/{subtasks.length})</CardTitle>
-            <Button onClick={() => setShowCreateSubtask(true)}>Add Subtask</Button>
+            {canCreateTasks && <Button onClick={() => setShowCreateSubtask(true)}>Add Subtask</Button>}
           </div>
         </CardHeader>
         <CardContent>
@@ -74,10 +109,10 @@ export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, avai
             <p className="text-body-sm text-muted-soft py-4 text-center">No subtasks yet. Break down this task into smaller steps.</p>
           ) : (
             <div className="divide-y divide-hairline-soft">
-              {subtasks.map((st) => (
+              {subtasks.map((st, index) => (
                 <div key={st.id} className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
-                    <CompleteButton taskId={st.id} isCompleted={st.status === "Completed"} />
+                    {canUpdateTasks && <CompleteButton taskId={st.id} isCompleted={st.status === "Completed"} />}
                     <div>
                       <span className={`text-body-sm ${st.status === "Completed" ? "text-muted line-through" : "text-body-strong"}`}>
                         {st.title}
@@ -89,7 +124,27 @@ export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, avai
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => setEditingSubtask(st)} className="text-body-sm text-primary hover:underline">Edit</button>
+                  {canUpdateTasks && (
+                    <div className="flex items-center gap-3">
+                      {subtasks.length > 1 && (
+                        <MoveSubtaskButton
+                          parentTaskId={task.id as string}
+                          subtaskId={st.id}
+                          direction="up"
+                          disabled={index === 0}
+                        />
+                      )}
+                      {subtasks.length > 1 && (
+                        <MoveSubtaskButton
+                          parentTaskId={task.id as string}
+                          subtaskId={st.id}
+                          direction="down"
+                          disabled={index === subtasks.length - 1}
+                        />
+                      )}
+                      <button onClick={() => setEditingSubtask(st)} className="text-body-sm text-primary hover:underline">Edit</button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -101,7 +156,7 @@ export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, avai
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle>Checklist ({checklistCompleted}/{checklists.length})</CardTitle>
-            <AddChecklistItem taskId={task.id as string} />
+            {canCreateTasks && <AddChecklistItem taskId={task.id as string} />}
           </div>
         </CardHeader>
         <CardContent>
@@ -111,11 +166,11 @@ export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, avai
             <div className="space-y-1">
               {checklists.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 py-1.5 group">
-                  <ChecklistToggle item={item} taskId={task.id as string} />
+                  {canUpdateTasks && <ChecklistToggle item={item} taskId={task.id as string} />}
                   <span className={`text-body-sm flex-1 ${item.is_completed ? "text-muted line-through" : "text-body"}`}>
                     {item.title}
                   </span>
-                  <DeleteChecklistItem itemId={item.id} taskId={task.id as string} />
+                  {canUpdateTasks && <DeleteChecklistItem itemId={item.id} taskId={task.id as string} />}
                 </div>
               ))}
             </div>
@@ -123,11 +178,22 @@ export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, avai
         </CardContent>
       </Card>
 
+      <TagsCard taskId={task.id as string} tags={tags} taskTags={taskTags} canUpdate={canUpdateTasks} />
+
+      <TimeTracking
+        taskId={task.id as string}
+        entries={timeEntries}
+        canCreate={canCreateTimeEntries}
+        canDelete={canDeleteTimeEntries}
+      />
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Dependencies ({dependencies.length})</CardTitle>
-            <AddDependencyButton taskId={task.id as string} projectId={task.project_id as string} availableTasks={availableTasks as { id: string; title: string; status: string }[]} />
+            {canUpdateTasks && (
+              <AddDependencyButton taskId={task.id as string} projectId={task.project_id as string} availableTasks={availableTasks as { id: string; title: string; status: string }[]} />
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -144,7 +210,7 @@ export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, avai
                       {dep.depends_on?.status || "—"}
                     </Badge>
                   </div>
-                  <RemoveDependencyButton dependencyId={dep.id} />
+                  {canUpdateTasks && <RemoveDependencyButton dependencyId={dep.id} />}
                 </div>
               ))}
             </div>
@@ -184,6 +250,7 @@ export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, avai
         <SubtaskModal
           parentTaskId={task.id as string}
           projectId={task.project_id as string}
+          assigneeOptions={assigneeOpts}
           onClose={() => setShowCreateSubtask(false)}
           onSuccess={() => setShowCreateSubtask(false)}
         />
@@ -194,6 +261,7 @@ export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, avai
           parentTaskId={task.id as string}
           projectId={task.project_id as string}
           subtask={editingSubtask}
+          assigneeOptions={assigneeOpts}
           onClose={() => setEditingSubtask(null)}
           onSuccess={() => setEditingSubtask(null)}
         />
@@ -202,6 +270,7 @@ export function TaskDetail({ task, subtasks: initialSubtasks, dependencies, avai
       {showEditTask && (
         <EditTaskModal
           task={task}
+          assigneeOptions={assigneeOpts}
           onClose={() => setShowEditTask(false)}
           onSuccess={() => setShowEditTask(false)}
         />
@@ -260,11 +329,15 @@ function CommentForm({ taskId }: { taskId: string }) {
   );
 }
 
-function SubtaskModal({ parentTaskId, projectId, subtask, onClose, onSuccess }: {
-  parentTaskId: string; projectId: string; subtask?: SubtaskRow; onClose: () => void; onSuccess: () => void;
+function SubtaskModal({ parentTaskId, projectId, subtask, assigneeOptions, onClose, onSuccess }: {
+  parentTaskId: string; projectId: string; subtask?: SubtaskRow;
+  assigneeOptions: { value: string; label: string }[]; onClose: () => void; onSuccess: () => void;
 }) {
   const action = subtask ? updateTask : createSubtask;
   const { formAction, isPending, state } = useQueuedFormAction(subtask ? "task.update" : null, action);
+
+  // Editing offers only the transitions allowed from the current status (Historia 7.5).
+  const statusOpts = subtask ? getAllowedTaskStatusOptions(subtask.status) : TASK_STATUS_OPTIONS;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -283,8 +356,9 @@ function SubtaskModal({ parentTaskId, projectId, subtask, onClose, onSuccess }: 
               <input type="hidden" name="project_id" value={projectId} />
               <FormField label="Title" name="title" defaultValue={subtask?.title} required />
               <FormTextarea label="Description" name="description" />
+              <FormSelect label="Assignee" name="assigned_to" options={assigneeOptions} defaultValue={""} />
               <FormSelect label="Status" name="status" options={statusOpts} defaultValue={subtask?.status || "Pending"} />
-              <FormSelect label="Priority" name="priority" options={priorityOpts} defaultValue={subtask?.priority || "Medium"} />
+              <FormSelect label="Priority" name="priority" options={TASK_PRIORITY_OPTIONS} defaultValue={subtask?.priority || "Medium"} />
               <FormField label="Estimated Hours" name="estimated_hours" type="number" defaultValue={String(subtask?.estimated_hours || 0)} />
               {subtask && (
                 <FormField label="Progress %" name="completion_percentage" type="number" min="0" max="100" defaultValue={String(subtask.completion_percentage)} />
@@ -302,8 +376,9 @@ function SubtaskModal({ parentTaskId, projectId, subtask, onClose, onSuccess }: 
   );
 }
 
-function EditTaskModal({ task, onClose, onSuccess }: {
-  task: Record<string, unknown>; onClose: () => void; onSuccess: () => void;
+function EditTaskModal({ task, assigneeOptions, onClose, onSuccess }: {
+  task: Record<string, unknown>; assigneeOptions: { value: string; label: string }[];
+  onClose: () => void; onSuccess: () => void;
 }) {
   const { formAction, isPending, state } = useQueuedFormAction("task.update", updateTask);
 
@@ -322,8 +397,14 @@ function EditTaskModal({ task, onClose, onSuccess }: {
               <input type="hidden" name="id" value={task.id as string} />
               <FormField label="Title" name="title" defaultValue={task.title as string} required />
               <FormTextarea label="Description" name="description" defaultValue={(task.description as string) || ""} />
-              <FormSelect label="Status" name="status" options={statusOpts} defaultValue={(task.status as string) || "Pending"} />
-              <FormSelect label="Priority" name="priority" options={priorityOpts} defaultValue={(task.priority as string) || "Medium"} />
+              <FormSelect
+                label="Assignee"
+                name="assigned_to"
+                options={assigneeOptions}
+                defaultValue={(task.assigned_to as string) || ""}
+              />
+              <FormSelect label="Status" name="status" options={getAllowedTaskStatusOptions(task.status as string)} defaultValue={(task.status as string) || "Pending"} />
+              <FormSelect label="Priority" name="priority" options={TASK_PRIORITY_OPTIONS} defaultValue={(task.priority as string) || "Medium"} />
               <FormField label="Estimated Hours" name="estimated_hours" type="number" defaultValue={String(task.estimated_hours || 0)} />
               <FormField label="Progress %" name="completion_percentage" type="number" min="0" max="100" defaultValue={String(task.completion_percentage || 0)} />
               <div className="grid grid-cols-2 gap-4">
@@ -340,6 +421,37 @@ function EditTaskModal({ task, onClose, onSuccess }: {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Historia 7.4 — archiving from the detail page; the list view keeps the
+// restore affordance so archived tasks stay recoverable.
+function ArchiveButton({ taskId, taskTitle }: { taskId: string; taskTitle: string }) {
+  const router = useRouter();
+  const [isArchiving, setIsArchiving] = useState(false);
+
+  async function handleArchive() {
+    if (!window.confirm(`Archive task "${taskTitle}"? You can restore it later.`)) return;
+
+    setIsArchiving(true);
+    try {
+      const result = await toggleTaskActive(taskId, false);
+      if (result.error) {
+        window.alert(result.error);
+        return;
+      }
+      router.push("/dashboard/tasks");
+    } catch {
+      window.alert("Unexpected error. Please try again.");
+    } finally {
+      setIsArchiving(false);
+    }
+  }
+
+  return (
+    <Button variant="secondary" onClick={handleArchive} disabled={isArchiving}>
+      {isArchiving ? "Archiving..." : "Archive"}
+    </Button>
   );
 }
 
@@ -451,6 +563,83 @@ function DeleteChecklistItem({ itemId, taskId }: { itemId: string; taskId: strin
         Delete
       </button>
     </form>
+  );
+}
+
+function MoveSubtaskButton({ parentTaskId, subtaskId, direction, disabled }: {
+  parentTaskId: string; subtaskId: string; direction: "up" | "down"; disabled?: boolean;
+}) {
+  const { formAction, isPending } = useQueuedFormAction(null, moveSubtask);
+  const label = direction === "up" ? "Move up" : "Move down";
+
+  return (
+    <form action={formAction} className="flex">
+      <input type="hidden" name="parent_task_id" value={parentTaskId} />
+      <input type="hidden" name="subtask_id" value={subtaskId} />
+      <input type="hidden" name="direction" value={direction} />
+      <button
+        type="submit"
+        disabled={disabled || isPending}
+        aria-label={label}
+        title={label}
+        className="flex h-6 w-6 items-center justify-center rounded border border-hairline text-muted transition-colors hover:border-muted hover:text-body-strong disabled:pointer-events-none disabled:opacity-30"
+      >
+        {direction === "up" ? (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M5 8V2M5 2L2 5M5 2l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M5 2v6m0 0l3-3M5 8L2 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </button>
+    </form>
+  );
+}
+
+function TagsCard({ taskId, tags, taskTags, canUpdate }: {
+  taskId: string; tags: TagRow[]; taskTags: TagRow[]; canUpdate: boolean;
+}) {
+  const { formAction, isPending, state } = useQueuedFormAction(null, updateTaskTags);
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Tags ({taskTags.length})</CardTitle></CardHeader>
+      <CardContent>
+        {tags.length === 0 ? (
+          <p className="text-body-sm text-muted-soft py-4 text-center">
+            No tags defined yet. Create them in Dashboard &rarr; Tags.
+          </p>
+        ) : canUpdate ? (
+          <form action={formAction} className="flex flex-col gap-4">
+            <input type="hidden" name="task_id" value={taskId} />
+            <TagSelector
+              tags={tags}
+              defaultSelected={taskTags.map((tag) => tag.id)}
+              name="tags"
+              label="Assign tags"
+              hint="Toggle the tags that describe this task."
+            />
+            {state?.error && <p className="text-body-sm text-error">{state.error}</p>}
+            {state?.success && <p className="text-body-sm text-success">{state.success}</p>}
+            <div>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Saving..." : "Save Tags"}
+              </Button>
+            </div>
+          </form>
+        ) : taskTags.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {taskTags.map((tag) => (
+              <TagChip key={tag.id} label={tag.name} color={tag.color} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-body-sm text-muted-soft">No tags assigned.</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

@@ -4,15 +4,24 @@ import type { Client } from "@/types";
 import {
   CLIENT_HISTORY_ACTIONS,
   type AssignedIntermediary,
+  type ClientAssignmentCandidate,
   type ClientFilters,
   type ClientHistoryFilters,
   type ClientHistoryResult,
   type ClientProjectSummary,
   type ClientWithRelations,
 } from "./clients.types";
-import type { ActivityLog } from "@/features/activity";
+import { ACCESS_AUDIT_ACTIONS, type ActivityLog } from "@/features/activity";
 
 const SORTABLE_COLUMNS = new Set(["created_at", "updated_at", "company_name", "status"]);
+
+// Access audit events are global-only and never part of the client timeline.
+function accessAuditExclusion(): { sql: string; args: InValue[] } {
+  return {
+    sql: `al.action NOT IN (${ACCESS_AUDIT_ACTIONS.map(() => "?").join(", ")})`,
+    args: [...ACCESS_AUDIT_ACTIONS],
+  };
+}
 
 function toBoolean(row: Record<string, unknown>): Client {
   return {
@@ -200,6 +209,7 @@ export class ClientsService {
 
   static async getLastActivity(clientId: string) {
     await assertClientVisible(clientId);
+    const exclusion = accessAuditExclusion();
 
     return queryOne(
       `SELECT al.id, al.action, al.entity, al.created_at,
@@ -208,9 +218,10 @@ export class ClientsService {
        LEFT JOIN users u ON u.id = al.user_id
        WHERE ((al.entity = 'Client' AND al.entity_id = ?)
               OR (al.entity_id IN (SELECT id FROM projects WHERE client_id = ?)))
+         AND ${exclusion.sql}
        ORDER BY al.created_at DESC
        LIMIT 1`,
-      [clientId, clientId],
+      [clientId, clientId, ...exclusion.args],
     );
   }
 
@@ -246,14 +257,15 @@ export class ClientsService {
       "pp.client_id = ?",
       "cc.client_id = ?",
     ];
-    const args: InValue[] = [clientId, clientId, clientId, clientId];
+    const scopeArgs: InValue[] = [clientId, clientId, clientId, clientId];
 
     const filterConditions: string[] = [];
+    const filterArgs: InValue[] = [];
 
     if (category) {
       const actions = CLIENT_HISTORY_ACTIONS[category];
       filterConditions.push(`al.action IN (${actions.map(() => "?").join(", ")})`);
-      args.push(...actions);
+      filterArgs.push(...actions);
     }
 
     if (search) {
@@ -261,7 +273,7 @@ export class ClientsService {
       filterConditions.push(
         "(lower(al.action) LIKE ? OR lower(coalesce(u.first_name, '') || ' ' || coalesce(u.last_name, '')) LIKE ? OR lower(coalesce(al.old_value, '')) LIKE ? OR lower(coalesce(al.new_value, '')) LIKE ?)",
       );
-      args.push(pattern, pattern, pattern, pattern);
+      filterArgs.push(pattern, pattern, pattern, pattern);
     }
 
     const fromClause = `
@@ -271,11 +283,20 @@ export class ClientsService {
       LEFT JOIN project_comments pc ON al.entity = 'Comment' AND al.entity_id = pc.id
       LEFT JOIN projects pp ON pp.id = pc.project_id
       LEFT JOIN client_comments cc ON al.entity = 'Comment' AND al.entity_id = cc.id`;
-    const whereClause = `((${scopeConditions.join(") OR (")})${
-      filterConditions.length > 0 ? ` AND ${filterConditions.join(" AND ")}` : ""
-    })`;
+    const exclusion = accessAuditExclusion();
+    // Args follow the WHERE placeholder order: scopes, access exclusion, then filters.
+    const whereParts = [
+      `(${scopeConditions.join(" OR ")})`,
+      exclusion.sql,
+      ...filterConditions,
+    ];
+    const whereArgs: InValue[] = [...scopeArgs, ...exclusion.args, ...filterArgs];
+    const whereClause = whereParts.join(" AND ");
 
-    const total = await countRows(`SELECT COUNT(*) AS total ${fromClause} WHERE ${whereClause}`, args);
+    const total = await countRows(
+      `SELECT COUNT(*) AS total ${fromClause} WHERE ${whereClause}`,
+      whereArgs,
+    );
 
     const data = await query<ActivityLog>(
       `SELECT al.id, al.user_id, al.action, al.entity, al.entity_id, al.old_value, al.new_value,
@@ -284,7 +305,7 @@ export class ClientsService {
        WHERE ${whereClause}
        ORDER BY al.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...args, pageSize, (page - 1) * pageSize],
+      [...whereArgs, pageSize, (page - 1) * pageSize],
     );
 
     return { data, total, page, pageSize };
@@ -357,6 +378,104 @@ export class ClientsService {
     return {
       id: current.intermediary_id,
       name: `${current.first_name} ${current.last_name}`,
+    };
+  }
+
+  static async listCandidatesForIntermediary(): Promise<ClientAssignmentCandidate[]> {
+    const conditions: string[] = ["c.deleted_at IS NULL", "c.is_active = 1"];
+    const args: InValue[] = [];
+
+    const scope = await clientScope("c.id");
+    if (scope.sql) {
+      conditions.push(scope.sql);
+      args.push(...scope.args);
+    }
+
+    const rows = await query<Record<string, unknown>>(
+      `SELECT c.id, c.company_name, c.contact_name, c.email, c.is_active,
+              c.intermediary_id, u.first_name AS intermediary_first_name, u.last_name AS intermediary_last_name
+       FROM clients c
+       LEFT JOIN users u ON u.id = c.intermediary_id
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY c.company_name ASC`,
+      args,
+    );
+
+    return rows.map((row) => ({
+      ...(row as unknown as ClientAssignmentCandidate),
+      is_active: !!row.is_active,
+    }));
+  }
+
+  static async assignClientsToIntermediary(intermediaryId: string, clientIds: string[]) {
+    const intermediary = await queryOne<{ id: string; first_name: string; last_name: string }>(
+      `SELECT u.id, u.first_name, u.last_name
+       FROM users u
+       JOIN roles r ON r.id = u.role_id
+       WHERE u.id = ? AND r.name = 'Intermediary' AND u.deleted_at IS NULL AND u.is_active = 1
+       LIMIT 1`,
+      [intermediaryId],
+    );
+
+    if (!intermediary) throw new Error("Intermediary not found.");
+
+    const intermediaryName = `${intermediary.first_name} ${intermediary.last_name}`;
+    const changes: Array<{
+      clientId: string;
+      companyName: string;
+      previousIntermediary: { id: string; name: string } | null;
+    }> = [];
+    let skippedCount = 0;
+
+    for (const clientId of clientIds) {
+      await assertClientVisible(clientId);
+
+      const current = await queryOne<{
+        company_name: string;
+        intermediary_id: string | null;
+        current_first_name: string | null;
+        current_last_name: string | null;
+      }>(
+        `SELECT c.company_name, c.intermediary_id,
+                cu.first_name AS current_first_name, cu.last_name AS current_last_name
+         FROM clients c
+         LEFT JOIN users cu ON cu.id = c.intermediary_id
+         WHERE c.id = ? AND c.deleted_at IS NULL AND c.is_active = 1
+         LIMIT 1`,
+        [clientId],
+      );
+
+      if (!current) throw new Error("Client not found.");
+      if (current.intermediary_id === intermediaryId) {
+        skippedCount += 1;
+        continue;
+      }
+
+      await query(`UPDATE clients SET intermediary_id = ?, updated_at = ? WHERE id = ?`, [
+        intermediaryId,
+        new Date().toISOString(),
+        clientId,
+      ]);
+
+      changes.push({
+        clientId,
+        companyName: current.company_name,
+        previousIntermediary:
+          current.intermediary_id && current.current_first_name
+            ? {
+                id: current.intermediary_id,
+                name:
+                  `${current.current_first_name} ${current.current_last_name ?? ""}`.trim(),
+              }
+            : null,
+      });
+    }
+
+    return {
+      intermediaryName,
+      assignedCount: changes.length,
+      skippedCount,
+      changes,
     };
   }
 

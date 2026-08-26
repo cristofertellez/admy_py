@@ -6,18 +6,14 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/forms";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
 import { createIntermediary, updateIntermediary, toggleIntermediaryActive } from "@/actions/intermediaries";
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { ColumnDef } from "@tanstack/react-table";
+import type { IntermediaryRecord } from "@/features/intermediaries";
 import Link from "next/link";
 
-interface IntermediaryRow {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  is_active: boolean;
-  created_at: string;
-}
+type IntermediaryRow = IntermediaryRecord;
 
 const columns: ColumnDef<IntermediaryRow>[] = [
   {
@@ -35,41 +31,161 @@ const columns: ColumnDef<IntermediaryRow>[] = [
     header: "Status",
     cell: ({ getValue }) => <Badge variant={getValue() ? "success" : "error"}>{getValue() ? "Active" : "Inactive"}</Badge>,
   },
+  {
+    accessorKey: "created_at",
+    header: "Created",
+    cell: ({ getValue }) => new Date(getValue() as string).toLocaleDateString(),
+  },
 ];
 
-interface Props { initialData: Record<string, unknown>[] }
+interface IntermediariesTableProps {
+  initialData: IntermediaryRecord[];
+  total: number;
+  initialFilters: { search: string; status: string };
+  pageIndex: number;
+  pageSize: number;
+}
 
-export function IntermediariesTable({ initialData }: Props) {
-  const [items, setItems] = useState(initialData as unknown as IntermediaryRow[]);
+export function IntermediariesTable({
+  initialData,
+  total,
+  initialFilters,
+  pageIndex,
+  pageSize,
+}: IntermediariesTableProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<IntermediaryRow | null>(null);
+  const [searchInput, setSearchInput] = useState(initialFilters.search);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [, startTransition] = useTransition();
+  const debouncedSearch = useDebounce(searchInput, 400);
 
-  function handleToggle(id: string, current: boolean) {
-    startTransition(async () => {
-      await toggleIntermediaryActive(id, !current);
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, is_active: !current } : i)));
+  function navigate(overrides: Record<string, string | undefined>) {
+    const next = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    const qs = next.toString();
+    startTransition(() => {
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
     });
   }
 
-  const actionColumns: ColumnDef<IntermediaryRow>[] = [...columns, {
-    id: "actions", header: "Actions",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-2">
-        <button onClick={() => setEditing(row.original)} className="text-body-sm text-primary hover:underline">Edit</button>
-        <button onClick={() => handleToggle(row.original.id, row.original.is_active)} className="text-body-sm text-muted hover:text-body-strong">
-          {row.original.is_active ? "Deactivate" : "Activate"}
-        </button>
-      </div>
-    ),
-  }];
+  useEffect(() => {
+    if (debouncedSearch === initialFilters.search) return;
+    navigate({ search: debouncedSearch || undefined, page: undefined });
+  }, [debouncedSearch]);
+
+  function handleToggle(intermediary: IntermediaryRow) {
+    const deactivating = intermediary.is_active;
+    if (
+      deactivating &&
+      !window.confirm(`Deactivate "${intermediary.first_name} ${intermediary.last_name}"? They will lose access immediately.`)
+    ) {
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await toggleIntermediaryActive(intermediary.id, !deactivating);
+      if (result?.error) {
+        setFeedback({ type: "error", message: result.error });
+        return;
+      }
+      setFeedback({ type: "success", message: result.success ?? "" });
+      router.refresh();
+    });
+  }
+
+  const actionColumns: ColumnDef<IntermediaryRow>[] = [
+    ...columns,
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/intermediaries/${row.original.id}`}
+            className="text-body-sm text-primary hover:underline"
+          >
+            View
+          </Link>
+          <button
+            onClick={() => setEditing(row.original)}
+            className="text-body-sm text-primary hover:underline"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => handleToggle(row.original)}
+            className="text-body-sm text-muted hover:text-body-strong"
+          >
+            {row.original.is_active ? "Deactivate" : "Activate"}
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end"><Button onClick={() => setShowCreate(true)}>Add Intermediary</Button></div>
-      <DataTable columns={actionColumns} data={items} searchColumn="first_name" />
-      {showCreate && <FormModal onClose={() => setShowCreate(false)} onSuccess={() => setShowCreate(false)} />}
-      {editing && <FormModal item={editing} onClose={() => setEditing(null)} onSuccess={() => setEditing(null)} />}
+      {feedback && (
+        <p
+          role="status"
+          aria-live="polite"
+          className={feedback.type === "error" ? "text-body-sm text-error" : "text-body-sm text-success"}
+        >
+          {feedback.message}
+        </p>
+      )}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:w-40">
+          <label
+            htmlFor="intermediaries-status-filter"
+            className="mb-1.5 block text-body-sm font-medium text-body-strong"
+          >
+            Status
+          </label>
+          <select
+            id="intermediaries-status-filter"
+            value={initialFilters.status}
+            onChange={(e) => navigate({ status: e.target.value || undefined, page: undefined })}
+            className="h-10 w-full rounded-md border border-hairline bg-surface-card px-3 py-2 text-body-sm text-body-strong focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          >
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <Button onClick={() => setShowCreate(true)}>Add Intermediary</Button>
+      </div>
+
+      <DataTable
+        columns={actionColumns}
+        data={initialData}
+        totalCount={total}
+        searchColumn="first_name"
+        searchPlaceholder="Search by name or email..."
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onPaginationChange={(pagination) =>
+          navigate({ page: pagination.pageIndex === 0 ? undefined : String(pagination.pageIndex + 1) })
+        }
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+      />
+
+      {showCreate && (
+        <FormModal onClose={() => setShowCreate(false)} onSuccess={() => { setShowCreate(false); router.refresh(); }} />
+      )}
+
+      {editing && (
+        <FormModal item={editing} onClose={() => setEditing(null)} onSuccess={() => { setEditing(null); router.refresh(); }} />
+      )}
     </div>
   );
 }
@@ -80,7 +196,7 @@ function FormModal({ item, onClose, onSuccess }: { item?: IntermediaryRow; onClo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
         <CardHeader>
           <CardTitle>{item ? "Edit" : "Create"} Intermediary</CardTitle>
           <button onClick={onClose} className="text-muted hover:text-body-strong text-lg leading-none">✕</button>

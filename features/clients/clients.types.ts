@@ -61,6 +61,17 @@ export interface ClientDetailData {
   activity: ActivityLog[];
 }
 
+export interface ClientAssignmentCandidate {
+  id: string;
+  company_name: string;
+  contact_name: string | null;
+  email: string | null;
+  is_active: boolean;
+  intermediary_id: string | null;
+  intermediary_first_name: string | null;
+  intermediary_last_name: string | null;
+}
+
 export const CLIENT_HISTORY_ACTIONS = {
   client: ["created_client", "updated_client", "archived_client", "restored_client"],
   projects: ["created_project"],

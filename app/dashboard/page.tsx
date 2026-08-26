@@ -1,13 +1,37 @@
 import { requireAuth } from "@/lib/auth";
 import { DashboardService } from "@/features/dashboard";
+import { NotificationsService } from "@/features/notifications";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
 import { DashboardCharts } from "./dashboard-charts";
+import { IntermediaryPanel } from "./intermediary-panel";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   const user = await requireAuth();
+
+  // Time-based notifications (delays / upcoming deadlines) are generated
+  // idempotently on dashboard load; failures must not break the page.
+  try {
+    await NotificationsService.syncTimeBasedNotifications();
+  } catch (err) {
+    console.error("[notifications] time-based sync failed:", err instanceof Error ? err.message : err);
+  }
+
+  if (user.role === "Intermediary") {
+    const panel = await DashboardService.getIntermediaryPanel(user);
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-display-sm text-ink">Welcome, {user.first_name}</h1>
+          <p className="mt-1 text-body-sm text-muted">Here&apos;s what&apos;s happening with your clients.</p>
+        </div>
+        <IntermediaryPanel data={panel} />
+      </div>
+    );
+  }
+
   const stats = await DashboardService.getStats(user);
 
   const statCards = [

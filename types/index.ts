@@ -18,6 +18,7 @@ export type ProjectStatus =
 
 export type TaskStatus =
   | "Pending"
+  | "Planned"
   | "In Progress"
   | "Blocked"
   | "In Review"
@@ -172,5 +173,13 @@ export interface Notification {
   entity_type: string | null;
   entity_id: string | null;
   is_read: boolean;
+  created_at: string;
+}
+
+// Tag taxonomy (PRD §35): classifies projects and tasks.
+export interface Tag {
+  id: string;
+  name: string;
+  color: string | null;
   created_at: string;
 }

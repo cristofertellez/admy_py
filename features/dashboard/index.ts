@@ -4,4 +4,9 @@ export type {
   AdminUserStats,
   RoleDistributionItem,
   RecentLogin,
+  DueSoonProject,
+  IntermediaryPanelData,
+  IntermediaryPanelStats,
+  PanelComment,
+  PendingTaskSummary,
 } from "./dashboard.service";

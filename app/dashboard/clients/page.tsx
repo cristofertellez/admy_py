@@ -1,4 +1,4 @@
-import { requirePermission } from "@/lib/auth";
+import { requirePermission, hasPermission } from "@/lib/auth";
 import { ClientsService } from "@/features/clients";
 import { ClientsTable } from "./clients-table";
 import type { Metadata } from "next";
@@ -18,7 +18,7 @@ interface ClientsPageProps {
 }
 
 export default async function ClientsPage({ searchParams }: ClientsPageProps) {
-  await requirePermission("clients.read");
+  const actor = await requirePermission("clients.read");
   const params = await searchParams;
 
   const search = params.search?.trim() || undefined;
@@ -47,6 +47,8 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
         initialFilters={{ search: search ?? "", status: status ?? "" }}
         pageIndex={page - 1}
         pageSize={PAGE_SIZE}
+        canCreate={hasPermission(actor, "clients.create")}
+        canUpdate={hasPermission(actor, "clients.update")}
       />
     </div>
   );

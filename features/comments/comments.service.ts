@@ -8,6 +8,7 @@ import {
   requireScopedUser,
 } from "@/lib/auth-scope";
 import { newId, query, queryOne } from "@/lib/turso/client";
+import { hasFullAccess } from "@/lib/roles";
 import type { Comment } from "@/types";
 
 export interface CommentWithAuthor extends Comment {
@@ -43,7 +44,7 @@ export class CommentsService {
       `SELECT pc.*, u.first_name AS author_first_name, u.last_name AS author_last_name, u.avatar AS author_avatar
        FROM project_comments pc
        LEFT JOIN users u ON u.id = pc.user_id
-       WHERE pc.project_id = ? AND pc.parent_comment_id IS NULL AND pc.deleted_at IS NULL AND pc.is_active = 1${scope.sql ? ` AND ${scope.sql}` : ""}
+       WHERE pc.project_id = ? AND pc.deleted_at IS NULL AND pc.is_active = 1${scope.sql ? ` AND ${scope.sql}` : ""}
        ORDER BY pc.created_at ASC`,
       [projectId, ...scope.args],
     );
@@ -73,6 +74,16 @@ export class CommentsService {
     parent_comment_id?: string;
   }) {
     await assertProjectVisible(input.project_id);
+
+    if (input.parent_comment_id) {
+      const parent = await queryOne<{ project_id: string }>(
+        `SELECT project_id FROM project_comments WHERE id = ? AND deleted_at IS NULL AND is_active = 1 LIMIT 1`,
+        [input.parent_comment_id],
+      );
+      if (!parent || parent.project_id !== input.project_id) {
+        throw new Error("Parent comment not found.");
+      }
+    }
 
     const id = newId();
     await query(
@@ -108,15 +119,36 @@ export class CommentsService {
     return { ...row, is_edited: Number(row.is_edited) === 1, is_active: Number(row.is_active) === 1 };
   }
 
-  static async deleteProjectComment(id: string) {
+  static async updateProjectComment(id: string, message: string) {
     const user = await requireScopedUser();
     const comment = await queryOne<{ user_id: string }>(
-      "SELECT user_id FROM project_comments WHERE id = ?",
+      "SELECT user_id FROM project_comments WHERE id = ? AND deleted_at IS NULL AND is_active = 1",
       [id],
     );
     if (!comment) throw new Error("Comment not found.");
 
-    if (user.role !== "Developer" && comment.user_id !== user.id) {
+    const canModerate = hasFullAccess(user.role) || hasPermission(user, "comments.update");
+    if (!canModerate && comment.user_id !== user.id) {
+      throw new Error("You can only edit your own comments.");
+    }
+
+    const now = new Date().toISOString();
+    await query(
+      "UPDATE project_comments SET message = ?, is_edited = 1, edited_at = ?, updated_at = ? WHERE id = ?",
+      [message, now, now, id],
+    );
+  }
+
+  static async deleteProjectComment(id: string) {
+    const user = await requireScopedUser();
+    const comment = await queryOne<{ user_id: string }>(
+      "SELECT user_id FROM project_comments WHERE id = ? AND deleted_at IS NULL AND is_active = 1",
+      [id],
+    );
+    if (!comment) throw new Error("Comment not found.");
+
+    const canModerate = hasFullAccess(user.role) || hasPermission(user, "comments.delete");
+    if (!canModerate && comment.user_id !== user.id) {
       throw new Error("You can only delete your own comments.");
     }
 
@@ -135,7 +167,7 @@ export class CommentsService {
     ]);
     if (!comment) throw new Error("Comment not found.");
 
-    if (user.role !== "Developer" && comment.user_id !== user.id) {
+    if (!hasFullAccess(user.role) && comment.user_id !== user.id) {
       throw new Error("You can only delete your own comments.");
     }
 
@@ -206,7 +238,7 @@ export class CommentsService {
     if (!comment) throw new Error("Comment not found.");
 
     const canModerate =
-      user.role === "Developer" ||
+      hasFullAccess(user.role) ||
       (hasPermission(user, "comments.update"));
     if (!canModerate && comment.user_id !== user.id) {
       throw new Error("You can only edit your own comments.");
@@ -228,7 +260,7 @@ export class CommentsService {
     if (!comment) throw new Error("Comment not found.");
 
     const canModerate =
-      user.role === "Developer" ||
+      hasFullAccess(user.role) ||
       (hasPermission(user, "comments.delete"));
     if (!canModerate && comment.user_id !== user.id) {
       throw new Error("You can only delete your own comments.");

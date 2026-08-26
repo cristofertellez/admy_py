@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { createTag, updateTag, deleteTag } from "@/actions/tags";
 import { Button } from "@/components/ui/button";
+import { TagChip } from "@/components/shared/tag-chip";
+import { TAG_COLOR_OPTIONS } from "@/constants";
+
 interface Tag {
   id: string;
   name: string;
@@ -10,43 +13,86 @@ interface Tag {
   created_at: string;
 }
 
-const TAG_COLORS = [
-  "#3B82F6", "#EF4444", "#22C55E", "#F59E0B", "#8B5CF6",
-  "#EC4899", "#06B6D4", "#F97316", "#6366F1", "#14B8A6",
-];
+type Feedback = { type: "success" | "error"; message: string };
 
 export function TagsTable({ tags }: { tags: Tag[] }) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [color, setColor] = useState("#3B82F6");
+  const [color, setColor] = useState<string>(TAG_COLOR_OPTIONS[0]);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   function resetForm() {
     setIsCreating(false);
     setEditingId(null);
     setName("");
-    setColor("#3B82F6");
+    setColor(TAG_COLOR_OPTIONS[0]);
+  }
+
+  async function handleSave(formData: FormData) {
+    const result = editingId ? await updateTag(formData) : await createTag(formData);
+    if (result?.error) {
+      setFeedback({ type: "error", message: result.error });
+      return;
+    }
+    setFeedback({
+      type: "success",
+      message: editingId ? "Tag updated." : "Tag created.",
+    });
+    resetForm();
+  }
+
+  async function handleDelete(tag: Tag) {
+    if (
+      !window.confirm(
+        `Delete tag "${tag.name}"? It will be removed from all projects and tasks.`,
+      )
+    ) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("id", tag.id);
+    const result = await deleteTag(formData);
+    if (result?.error) {
+      setFeedback({ type: "error", message: result.error });
+      return;
+    }
+    if (editingId === tag.id) resetForm();
+    setFeedback({ type: "success", message: "Tag deleted." });
   }
 
   return (
     <div className="space-y-4">
-      {!isCreating && (
-        <Button onClick={() => setIsCreating(true)} className="text-body-sm">
+      {feedback && (
+        <p
+          role="status"
+          aria-live="polite"
+          className={
+            feedback.type === "error"
+              ? "text-body-sm text-error"
+              : "text-body-sm text-success"
+          }
+        >
+          {feedback.message}
+        </p>
+      )}
+
+      {!isCreating && !editingId && (
+        <Button
+          onClick={() => {
+            setFeedback(null);
+            setIsCreating(true);
+          }}
+          className="text-body-sm"
+        >
           + New Tag
         </Button>
       )}
 
       {(isCreating || editingId) && (
         <form
-          action={async (formData) => {
-            if (editingId) {
-              formData.append("id", editingId);
-              await updateTag(formData);
-            } else {
-              await createTag(formData);
-            }
-            resetForm();
-          }}
+          action={handleSave}
           className="flex flex-wrap items-end gap-3 rounded-lg border border-hairline bg-surface-card p-4"
         >
           <div className="flex-1 min-w-[150px]">
@@ -57,16 +103,20 @@ export function TagsTable({ tags }: { tags: Tag[] }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="Tag name"
               required
+              maxLength={50}
               className="w-full rounded-md border border-hairline bg-canvas px-3 py-2 text-body-sm text-body-strong placeholder:text-muted-soft focus:border-primary focus:outline-none"
             />
           </div>
           <div>
             <label className="mb-1 block text-caption-uppercase text-muted-soft">Color</label>
-            <div className="flex gap-1.5">
-              {TAG_COLORS.map((c) => (
+            <div className="flex gap-1.5" role="radiogroup" aria-label="Tag color">
+              {TAG_COLOR_OPTIONS.map((c) => (
                 <button
                   key={c}
                   type="button"
+                  role="radio"
+                  aria-checked={color === c}
+                  aria-label={`Color ${c}`}
                   onClick={() => setColor(c)}
                   className={`h-6 w-6 rounded-full border-2 transition-colors ${
                     color === c ? "border-ink scale-110" : "border-transparent"
@@ -83,7 +133,10 @@ export function TagsTable({ tags }: { tags: Tag[] }) {
             </Button>
             <button
               type="button"
-              onClick={resetForm}
+              onClick={() => {
+                resetForm();
+                setFeedback(null);
+              }}
               className="rounded-md px-3 py-2 text-body-sm text-muted hover:text-body-strong"
             >
               Cancel
@@ -110,12 +163,7 @@ export function TagsTable({ tags }: { tags: Tag[] }) {
               {tags.map((tag) => (
                 <tr key={tag.id} className="border-b border-hairline-soft hover:bg-surface-card/50">
                   <td className="px-4 py-3">
-                    <span
-                      className="inline-flex items-center rounded-pill px-2.5 py-0.5 text-caption-uppercase font-semibold border"
-                      style={{ backgroundColor: tag.color + "20", color: tag.color, borderColor: tag.color }}
-                    >
-                      {tag.name}
-                    </span>
+                    <TagChip label={tag.name} color={tag.color} />
                   </td>
                   <td className="px-4 py-3 text-body-sm text-muted">
                     {new Date(tag.created_at).toLocaleDateString()}
@@ -128,21 +176,18 @@ export function TagsTable({ tags }: { tags: Tag[] }) {
                           setName(tag.name);
                           setColor(tag.color);
                           setIsCreating(false);
+                          setFeedback(null);
                         }}
-                        className="text-body-sm text-muted hover:text-body-strong"
+                        className="text-body-sm text-primary hover:underline"
                       >
                         Edit
                       </button>
-                      <form
-                        action={async (formData) => {
-                          formData.append("id", tag.id);
-                          await deleteTag(formData);
-                        }}
+                      <button
+                        onClick={() => handleDelete(tag)}
+                        className="text-body-sm text-error hover:underline"
                       >
-                        <button type="submit" className="text-body-sm text-error hover:underline">
-                          Delete
-                        </button>
-                      </form>
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>

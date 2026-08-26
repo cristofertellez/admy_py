@@ -1,24 +1,16 @@
 import { requirePermission } from "@/lib/auth";
-import { query } from "@/lib/turso/client";
+import { TagsService } from "@/features/tags";
+import { DEFAULT_TAG_COLOR } from "@/constants";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
 import { TagsTable } from "./tags-table";
 import type { Metadata } from "next";
-
-interface TagRow {
-  id: string;
-  name: string;
-  color: string | null;
-  created_at: string;
-}
 
 export const metadata: Metadata = { title: "Tags" };
 
 export default async function TagsPage() {
   await requirePermission("tasks.read");
 
-  const tags = await query<TagRow>(
-    `SELECT id, name, color, created_at FROM tags ORDER BY name`,
-  );
+  const tags = await TagsService.list();
 
   return (
     <div className="space-y-6">
@@ -37,7 +29,7 @@ export default async function TagsPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <TagsTable tags={tags.map((tag) => ({ ...tag, color: tag.color ?? "#3B82F6" }))} />
+          <TagsTable tags={tags.map((tag) => ({ ...tag, color: tag.color ?? DEFAULT_TAG_COLOR }))} />
         </CardContent>
       </Card>
     </div>

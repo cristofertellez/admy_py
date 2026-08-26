@@ -18,7 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div>
       <Header>
-        <DashboardSidebar role={user.role} />
+        <DashboardSidebar role={user.role} userId={user.id} />
         <ConnectivityIndicator />
         <DashboardHeaderActions />
       </Header>

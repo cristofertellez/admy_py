@@ -151,6 +151,7 @@ export async function toggleClientActive(id: string, isActive: boolean) {
       });
     }
     revalidatePath("/dashboard/clients");
+    revalidatePath("/dashboard");
     return { success: isActive ? "Client restored." : "Client archived." };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to update client." };
@@ -179,6 +180,7 @@ export async function assignClientIntermediary(_prevState: unknown, formData: Fo
     });
 
     revalidatePath(`/dashboard/clients/${clientId}`);
+    revalidatePath("/dashboard");
     return { success: "Intermediary assigned." };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to assign intermediary." };
@@ -203,6 +205,7 @@ export async function removeClientIntermediary(clientId: string) {
     }
 
     revalidatePath(`/dashboard/clients/${clientId}`);
+    revalidatePath("/dashboard");
     return { success: "Intermediary removed." };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to remove intermediary." };

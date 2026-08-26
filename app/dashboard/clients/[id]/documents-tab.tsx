@@ -22,6 +22,7 @@ interface Props {
   canUpload: boolean;
   canDelete: boolean;
   canDownload: boolean;
+  entityType?: string;
 }
 
 const PREVIEWABLE_MIME_PREFIXES = ["image/", "application/pdf", "text/"];
@@ -36,7 +37,7 @@ function isPreviewable(mimeType: string | null): boolean {
   return !!mimeType && PREVIEWABLE_MIME_PREFIXES.some((prefix) => mimeType.startsWith(prefix));
 }
 
-export function DocumentsTab({ entityId, documents, canUpload, canDelete, canDownload }: Props) {
+export function DocumentsTab({ entityId, documents, canUpload, canDelete, canDownload, entityType = "client" }: Props) {
   const [showUploadModal, setShowUploadModal] = useState(false);
 
   return (
@@ -77,6 +78,7 @@ export function DocumentsTab({ entityId, documents, canUpload, canDelete, canDow
       {showUploadModal && (
         <UploadDocumentModal
           entityId={entityId}
+          entityType={entityType}
           onClose={() => setShowUploadModal(false)}
           onSuccess={() => setShowUploadModal(false)}
         />
@@ -162,7 +164,7 @@ function DocumentActions({
   );
 }
 
-function UploadDocumentModal({ entityId, onClose, onSuccess }: { entityId: string; onClose: () => void; onSuccess: () => void }) {
+function UploadDocumentModal({ entityId, entityType = "client", onClose, onSuccess }: { entityId: string; entityType?: string; onClose: () => void; onSuccess: () => void }) {
   const [state, formAction, isPending] = useActionState(uploadFile, null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -194,7 +196,7 @@ function UploadDocumentModal({ entityId, onClose, onSuccess }: { entityId: strin
         </div>
         <CardContent className="pt-4">
           <form action={formAction} className="flex flex-col gap-4">
-            <input type="hidden" name="entity_type" value="client" />
+            <input type="hidden" name="entity_type" value={entityType} />
             <input type="hidden" name="entity_id" value={entityId} />
 
             <div

@@ -1,7 +1,16 @@
 import { assertProjectVisible, assertTaskVisible, projectScope } from "@/lib/auth-scope";
 import { countRows, newId, query, queryOne, type InValue } from "@/lib/turso/client";
 import type { Task } from "@/types";
+import { ACCESS_AUDIT_ACTIONS, type ActivityLog } from "@/features/activity";
 import type { TaskFilters, TaskWithFullRelations, TaskWithRelations } from "./tasks.types";
+
+// Access audit events are global-only and never part of the task history.
+function accessAuditExclusion(): { sql: string; args: InValue[] } {
+  return {
+    sql: `al.action NOT IN (${ACCESS_AUDIT_ACTIONS.map(() => "?").join(", ")})`,
+    args: [...ACCESS_AUDIT_ACTIONS],
+  };
+}
 
 interface TaskListRow extends Task {
   project_name: string | null;
@@ -21,7 +30,9 @@ interface DependencyRow {
   dep_project_id: string;
 }
 
-const SORTABLE_COLUMNS: Record<string, string> = {
+// Whitelist of columns the list endpoint may sort by (Historia 7.1). Exposed
+// so route handlers can validate the URL `sort` parameter against it.
+export const TASK_SORTABLE_COLUMNS: Record<string, string> = {
   position: "t.position",
   title: "t.title",
   status: "t.status",
@@ -31,6 +42,8 @@ const SORTABLE_COLUMNS: Record<string, string> = {
   estimated_start: "t.estimated_start",
   estimated_end: "t.estimated_end",
 };
+
+const SORTABLE_COLUMNS = TASK_SORTABLE_COLUMNS;
 
 function mapTask<T extends Task>(row: T): T {
   return { ...row, is_active: Number(row.is_active) === 1 };
@@ -45,18 +58,22 @@ export class TasksService {
       assignedTo,
       status,
       priority,
+      archived,
       page = 1,
       pageSize = 20,
       sortBy = "position",
       sortOrder = "asc",
     } = filters;
 
-    const conditions = ["t.deleted_at IS NULL", "t.is_active = 1", ...(scope.sql ? [scope.sql] : [])];
+    const visibility = archived
+      ? ["t.deleted_at IS NOT NULL", "t.is_active = 0"]
+      : ["t.deleted_at IS NULL", "t.is_active = 1"];
+    const conditions = [...visibility, ...(scope.sql ? [scope.sql] : [])];
     const args: InValue[] = [...(scope.sql ? scope.args : [])];
 
     if (search) {
-      conditions.push("LOWER(t.title) LIKE LOWER(?)");
-      args.push(`%${search}%`);
+      conditions.push("(LOWER(t.title) LIKE LOWER(?) OR LOWER(COALESCE(t.description, '')) LIKE LOWER(?))");
+      args.push(`%${search}%`, `%${search}%`);
     }
     if (projectId) {
       conditions.push("t.project_id = ?");
@@ -191,6 +208,44 @@ export class TasksService {
     ]);
   }
 
+  static async restore(id: string) {
+    await assertTaskVisible(id);
+
+    await query("UPDATE tasks SET is_active = 1, deleted_at = NULL, updated_at = ? WHERE id = ?", [
+      new Date().toISOString(),
+      id,
+    ]);
+  }
+
+  // Change history of a task (Historia 7.3): audit events recorded on the task
+  // itself, newest first, with the same pagination contract as client history.
+  static async getHistory(taskId: string, filters: { page?: number; pageSize?: number } = {}) {
+    await assertTaskVisible(taskId);
+
+    const { page = 1, pageSize = 20 } = filters;
+    const exclusion = accessAuditExclusion();
+
+    const total = await countRows(
+      `SELECT COUNT(*) AS total
+       FROM activity_logs al
+       WHERE al.entity = 'Task' AND al.entity_id = ? AND ${exclusion.sql}`,
+      [taskId, ...exclusion.args],
+    );
+
+    const data = await query<ActivityLog>(
+      `SELECT al.id, al.user_id, al.action, al.entity, al.entity_id, al.old_value, al.new_value,
+              al.created_at, u.first_name AS user_first_name, u.last_name AS user_last_name
+       FROM activity_logs al
+       LEFT JOIN users u ON u.id = al.user_id
+       WHERE al.entity = 'Task' AND al.entity_id = ? AND ${exclusion.sql}
+       ORDER BY al.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [taskId, ...exclusion.args, pageSize, (page - 1) * pageSize],
+    );
+
+    return { data, total, page, pageSize };
+  }
+
   static async getSubtasks(parentTaskId: string) {
     const scope = await projectScope("t.project_id");
     const rows = await query<
@@ -213,6 +268,42 @@ export class TasksService {
             : null,
       }) as unknown as TaskWithRelations,
     );
+  }
+
+  // Swaps the subtask with its neighbour and renumbers the whole sibling list
+  // so legacy rows sharing position 0 end up with a stable explicit order.
+  static async moveSubtask(parentTaskId: string, subtaskId: string, direction: "up" | "down") {
+    if (direction !== "up" && direction !== "down") {
+      throw new Error("Invalid move direction.");
+    }
+
+    await assertTaskVisible(parentTaskId);
+
+    const scope = await projectScope("t.project_id");
+    const siblings = await query<{ id: string }>(
+      `SELECT t.id FROM tasks t
+       WHERE t.parent_task_id = ? AND t.is_active = 1 AND t.deleted_at IS NULL${scope.sql ? ` AND ${scope.sql}` : ""}
+       ORDER BY t.position ASC, t.created_at ASC`,
+      [parentTaskId, ...scope.args],
+    );
+
+    const ids = siblings.map((sibling) => sibling.id);
+    const index = ids.indexOf(subtaskId);
+    if (index === -1) throw new Error("Subtask not found.");
+
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= ids.length) return;
+
+    [ids[index], ids[targetIndex]] = [ids[targetIndex], ids[index]];
+
+    const now = new Date().toISOString();
+    for (let i = 0; i < ids.length; i++) {
+      await query("UPDATE tasks SET position = ?, updated_at = ? WHERE id = ?", [
+        i,
+        now,
+        ids[i],
+      ]);
+    }
   }
 
   static async getWithSubtasks(id: string) {
@@ -254,7 +345,7 @@ export class TasksService {
     return queryOne("SELECT * FROM task_dependencies WHERE id = ?", [id]);
   }
 
-  static async removeDependency(id: string) {
+  static async removeDependency(id: string): Promise<string | null> {
     const dependency = await queryOne<{ task_id: string }>(
       "SELECT task_id FROM task_dependencies WHERE id = ?",
       [id],
@@ -263,6 +354,8 @@ export class TasksService {
 
     await assertTaskVisible(dependency.task_id);
     await query("DELETE FROM task_dependencies WHERE id = ?", [id]);
+
+    return dependency.task_id;
   }
 
   static async getAvailableTasksForDependency(taskId: string, projectId: string) {

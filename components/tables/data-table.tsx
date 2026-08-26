@@ -32,10 +32,12 @@ interface DataTableProps<TData, TValue> {
   onSearchChange?: (value: string) => void;
   onPaginationChange?: (pagination: PaginationState) => void;
   onSortingChange?: (sorting: SortingState) => void;
+  initialSorting?: SortingState;
   pageSize?: number;
   pageIndex?: number;
   enableRowSelection?: boolean;
   onRowSelectionChange?: (selection: RowSelectionState) => void;
+  getRowId?: (row: TData) => string;
 }
 
 export function DataTable<TData, TValue>({
@@ -51,12 +53,14 @@ export function DataTable<TData, TValue>({
   onSearchChange,
   onPaginationChange,
   onSortingChange,
+  initialSorting,
   pageSize = 20,
   pageIndex = 0,
   enableRowSelection = false,
   onRowSelectionChange,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>(initialSorting ?? []);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -95,6 +99,7 @@ export function DataTable<TData, TValue>({
       onRowSelectionChange?.(next);
     },
     enableRowSelection,
+    getRowId,
     manualPagination: !!onPaginationChange,
     manualSorting: !!onSortingChange,
     manualFiltering: !!onSearchChange,

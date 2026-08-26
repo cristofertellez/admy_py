@@ -95,6 +95,18 @@ export class UsersService {
     };
   }
 
+  // Assignee options for task forms (Historia 7.2): active staff members only.
+  static async listAssigneeOptions() {
+    return query<{ id: string; first_name: string; last_name: string; role: string }>(
+      `SELECT u.id, u.first_name, u.last_name, r.name AS role
+       FROM users u
+       JOIN roles r ON r.id = u.role_id
+       WHERE r.name IN ('Developer', 'Intermediary')
+         AND u.deleted_at IS NULL AND u.is_active = 1
+       ORDER BY u.first_name ASC, u.last_name ASC`,
+    );
+  }
+
   static async create(input: {
     first_name: string;
     last_name: string;

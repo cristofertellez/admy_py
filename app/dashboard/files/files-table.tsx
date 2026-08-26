@@ -70,7 +70,15 @@ const columns: ColumnDef<FileRow>[] = [
   },
 ];
 
-function FileActions({ fileId, filename }: { fileId: string; filename: string }) {
+function FileActions({
+  fileId,
+  filename,
+  canDelete = false,
+}: {
+  fileId: string;
+  filename: string;
+  canDelete?: boolean;
+}) {
   const [, startTransition] = useTransition();
 
   function handleDownload() {
@@ -98,21 +106,40 @@ function FileActions({ fileId, filename }: { fileId: string; filename: string })
   return (
     <div className="flex items-center gap-2">
       <button onClick={handleDownload} className="text-body-sm text-primary hover:underline">Download</button>
-      <button onClick={handleDelete} className="text-body-sm text-error hover:underline">Delete</button>
+      {canDelete && <button onClick={handleDelete} className="text-body-sm text-error hover:underline">Delete</button>}
     </div>
   );
 }
 
-export function FilesTable({ files }: { files: FileRow[] }) {
+interface FilesTableProps {
+  files: FileRow[];
+  canUpload: boolean;
+  canDelete: boolean;
+}
+
+export function FilesTable({ files, canUpload, canDelete }: FilesTableProps) {
   const [showForm, setShowForm] = useState(false);
+
+  const actionColumns: ColumnDef<FileRow>[] = columns.map((column) =>
+    column.id === "actions"
+      ? {
+          ...column,
+          cell: ({ row }: { row: { original: FileRow } }) => (
+            <FileActions fileId={row.original.id} filename={row.original.filename} canDelete={canDelete} />
+          ),
+        }
+      : column,
+  );
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button onClick={() => setShowForm(true)}>Upload File</Button>
-      </div>
+      {canUpload && (
+        <div className="flex justify-end">
+          <Button onClick={() => setShowForm(true)}>Upload File</Button>
+        </div>
+      )}
 
-      <DataTable columns={columns} data={files} searchColumn="filename" />
+      <DataTable columns={actionColumns} data={files} searchColumn="filename" />
 
       {showForm && (
         <FileUploadModal onClose={() => setShowForm(false)} onSuccess={() => setShowForm(false)} />

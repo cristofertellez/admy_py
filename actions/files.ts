@@ -95,6 +95,9 @@ export async function uploadFile(_prevState: unknown, formData: FormData) {
     if (entityType === "client") {
       revalidatePath(`/dashboard/clients/${entityId}`);
     }
+    if (entityType === "project") {
+      revalidatePath(`/dashboard/projects/${entityId}`);
+    }
     return { success: "File uploaded." };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to upload file." };
@@ -112,6 +115,15 @@ export async function getFileUrl(fileId: string) {
     }
 
     const url = await FilesService.getSignedUrl(file.bucket, file.storage_path);
+
+    await ActivityService.log({
+      user_id: user.id,
+      action: "downloaded_file",
+      entity: toActivityEntity(file.entity_type),
+      entity_id: file.entity_id,
+      new_value: { filename: file.filename },
+    });
+
     return { success: url };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to get file URL." };
@@ -136,6 +148,9 @@ export async function deleteFile(fileId: string) {
       revalidatePath(`/dashboard/${deleted.entity_type}s`, "layout");
       if (deleted.entity_type === "client") {
         revalidatePath(`/dashboard/clients/${deleted.entity_id}`);
+      }
+      if (deleted.entity_type === "project") {
+        revalidatePath(`/dashboard/projects/${deleted.entity_id}`);
       }
     }
 

@@ -1,4 +1,5 @@
 import { getUser, type SessionProfile } from "@/lib/auth";
+import { hasFullAccess } from "@/lib/roles";
 import { queryOne, type InValue } from "@/lib/turso/client";
 import { ActivityService } from "@/services/activity.service";
 
@@ -18,8 +19,6 @@ export function isAccessDeniedError(error: unknown): error is AccessDeniedError 
   return error instanceof AccessDeniedError;
 }
 
-const DEVELOPER_ROLE = "Developer";
-
 const SCOPED_ENTITY_TYPES = new Set(["project", "task", "milestone", "client"]);
 
 async function requireUser(): Promise<SessionProfile> {
@@ -32,8 +31,10 @@ export async function requireScopedUser(): Promise<SessionProfile> {
   return requireUser();
 }
 
-function isDeveloper(user: SessionProfile): boolean {
-  return user.role === DEVELOPER_ROLE;
+function isFullAccessUser(user: SessionProfile): boolean {
+  // Historia 6.18: Developer, Administrator y Super Administrator ven todos
+  // los datos; Client e Intermediary pasan por los filtros de cartera.
+  return hasFullAccess(user.role);
 }
 
 async function denyAccess(
@@ -88,14 +89,14 @@ function visibleClientsFragment(user: SessionProfile): ScopeClause {
 }
 
 function projectVisibilityClause(column: string, user: SessionProfile): ScopeClause {
-  if (isDeveloper(user)) return { sql: "", args: [] };
+  if (isFullAccessUser(user)) return { sql: "", args: [] };
 
   const fragment = visibleProjectsFragment(user);
   return { sql: `${column} IN ${fragment.sql}`, args: fragment.args };
 }
 
 function clientVisibilityClause(column: string, user: SessionProfile): ScopeClause {
-  if (isDeveloper(user)) return { sql: "", args: [] };
+  if (isFullAccessUser(user)) return { sql: "", args: [] };
 
   const fragment = visibleClientsFragment(user);
   return { sql: `${column} IN ${fragment.sql}`, args: fragment.args };
@@ -116,7 +117,7 @@ export async function attachmentScope(
   entityIdColumn: string,
 ): Promise<ScopeClause> {
   const user = await requireUser();
-  if (isDeveloper(user)) return { sql: "", args: [] };
+  if (isFullAccessUser(user)) return { sql: "", args: [] };
 
   const projects = visibleProjectsFragment(user);
   const clients = visibleClientsFragment(user);
@@ -137,7 +138,7 @@ export async function attachmentScope(
 
 export async function assertProjectVisible(projectId: string, user?: SessionProfile): Promise<void> {
   const actor = user ?? (await requireUser());
-  if (isDeveloper(actor)) return;
+  if (isFullAccessUser(actor)) return;
 
   const membership = projectMembershipFilter(actor);
   const visible = await queryOne<{ ok: number }>(
@@ -156,7 +157,7 @@ export async function assertProjectVisible(projectId: string, user?: SessionProf
 
 export async function assertTaskVisible(taskId: string, user?: SessionProfile): Promise<void> {
   const actor = user ?? (await requireUser());
-  if (isDeveloper(actor)) return;
+  if (isFullAccessUser(actor)) return;
 
   const task = await queryOne<{ project_id: string }>(
     "SELECT project_id FROM tasks WHERE id = ? AND deleted_at IS NULL",
@@ -169,7 +170,7 @@ export async function assertTaskVisible(taskId: string, user?: SessionProfile): 
 
 export async function assertClientVisible(clientId: string, user?: SessionProfile): Promise<void> {
   const actor = user ?? (await requireUser());
-  if (isDeveloper(actor)) return;
+  if (isFullAccessUser(actor)) return;
 
   const filter =
     actor.role === "Intermediary"
@@ -195,7 +196,7 @@ export async function assertMilestoneVisible(
   user?: SessionProfile,
 ): Promise<void> {
   const actor = user ?? (await requireUser());
-  if (isDeveloper(actor)) return;
+  if (isFullAccessUser(actor)) return;
 
   const milestone = await queryOne<{ project_id: string }>(
     "SELECT project_id FROM milestones WHERE id = ? AND deleted_at IS NULL",
@@ -212,7 +213,7 @@ export async function assertEntityVisible(
   user?: SessionProfile,
 ): Promise<void> {
   const actor = user ?? (await requireUser());
-  if (isDeveloper(actor)) return;
+  if (isFullAccessUser(actor)) return;
 
   const normalizedType = entityType?.toLowerCase();
 
