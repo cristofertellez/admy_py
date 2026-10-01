@@ -96,22 +96,13 @@ export class ProjectExportService {
       projectId,
       projectName: general.name,
       general,
-      schedule: milestones.map((milestone: Record<string, unknown> & { is_active: boolean }) => ({
-        title: String(milestone.title ?? ""),
-        description:
-          milestone.description === null || milestone.description === undefined
-            ? null
-            : String(milestone.description),
-        status: String(milestone.status ?? ""),
-        estimated_date:
-          milestone.estimated_date === null || milestone.estimated_date === undefined
-            ? null
-            : String(milestone.estimated_date),
-        completed_date:
-          milestone.completed_date === null || milestone.completed_date === undefined
-            ? null
-            : String(milestone.completed_date),
-        completion_percentage: Number(milestone.completion_percentage ?? 0),
+      schedule: milestones.map((milestone) => ({
+        title: milestone.title,
+        description: milestone.description ?? null,
+        status: milestone.status,
+        estimated_date: milestone.estimated_date ?? null,
+        completed_date: milestone.completed_date ?? null,
+        completion_percentage: milestone.completion_percentage ?? 0,
       })),
       indicators,
       hoursByUser: hoursRows.map((row) => ({

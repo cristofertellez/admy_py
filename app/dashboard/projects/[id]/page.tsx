@@ -8,6 +8,7 @@ import { TasksService } from "@/features/tasks";
 import { MilestonesService } from "@/features/milestones";
 import { CommentsService } from "@/features/comments";
 import { FilesService } from "@/features/files";
+import { getCatalogOptions } from "@/features/settings";
 import { getUser, hasPermission } from "@/lib/auth";
 import { isAccessDeniedError } from "@/lib/auth-scope";
 import { ActivityService } from "@/services/activity.service";
@@ -76,8 +77,17 @@ export default async function ProjectDetailPage({ params, searchParams }: Props)
 
   const { data: tasks } = await TasksService.list({ projectId: id, pageSize: 100 });
   const milestones = await MilestonesService.listByProject(id);
-  const comments = await CommentsService.listByProject(id);
-  const files = await FilesService.list({ entityType: "project", entityId: id, pageSize: 100 });
+  const [comments, files, milestoneStatusOptions] = await Promise.all([
+    CommentsService.listByProject(id),
+    FilesService.list({ entityType: "project", entityId: id, pageSize: 100 }),
+    getCatalogOptions("milestone_statuses", [
+      { value: "Pending", label: "Pending" },
+      { value: "In Progress", label: "In Progress" },
+      { value: "In Review", label: "In Review" },
+      { value: "Completed", label: "Completed" },
+      { value: "Cancelled", label: "Cancelled" },
+    ]),
+  ]);
   // Historias 6.6 / 6.9 / 6.15: estimaciones, indicadores y métricas calculadas en el servidor.
   const indicators = await ProjectIndicatorsService.getByProject(id);
 
@@ -187,6 +197,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Props)
         currentUserId={user?.id ?? null}
         canCreateComments={canCreateComments}
         canModerateComments={canModerateComments}
+        milestoneStatusOptions={milestoneStatusOptions}
       />
     </div>
   );

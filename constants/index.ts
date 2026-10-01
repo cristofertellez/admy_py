@@ -82,6 +82,31 @@ export const TASK_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
   Cancelled: ["Pending"],
 };
 
+export const MILESTONE_STATUSES = {
+  PENDING: "Pending",
+  IN_PROGRESS: "In Progress",
+  IN_REVIEW: "In Review",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+} as const;
+
+// Allowed milestone status transitions (Historia 8.4). Pending work can move
+// forward or be cancelled; Completed can be reopened and Cancelled returns to
+// Pending. Archiving is handled by the dedicated archive flow (Historia 8.13),
+// not by a status change.
+export const MILESTONE_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+  Pending: ["In Progress", "In Review", "Completed", "Cancelled"],
+  "In Progress": ["Pending", "In Review", "Completed", "Cancelled"],
+  "In Review": ["Pending", "In Progress", "Completed", "Cancelled"],
+  Completed: ["In Progress"],
+  Cancelled: ["Pending"],
+};
+
+export const MILESTONE_STATUS_OPTIONS = Object.values(MILESTONE_STATUSES).map((value) => ({
+  value,
+  label: value,
+}));
+
 export const PRIORITIES = {
   VERY_LOW: "Very Low",
   LOW: "Low",

@@ -10,15 +10,18 @@ import {
   deleteProjectCommentAction,
   updateProjectCommentAction,
 } from "@/actions/comments";
-import { createMilestone, updateMilestone } from "@/actions/milestones";
-import { FormField, FormSelect, FormTextarea } from "@/components/forms";
+import { FormField, FormSelect, FormTextarea, MentionTextarea } from "@/components/forms";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
 import { Timeline } from "@/components/charts/timeline";
+import { CommentBody, extractMentionStrings } from "@/components/shared/comment-body";
+import { CommentReactions } from "@/components/shared/comment-reactions";
+import { CommentAttachments } from "@/components/shared/comment-attachments";
 import { DocumentsTab } from "@/app/dashboard/clients/[id]/documents-tab";
 import { ActivityTimeline } from "@/app/dashboard/activity/activity-timeline";
 import { HistoryFilters } from "@/app/dashboard/clients/[id]/history-filters";
 import { IndicatorsTab } from "./indicators-tab";
 import { TeamSection } from "./team-section";
+import { MilestoneFormModal } from "./milestones/milestone-form-modal";
 import type {
   ProjectMetricsBundle,
   ProjectMember,
@@ -105,6 +108,7 @@ interface Props {
   currentUserId?: string | null;
   canCreateComments?: boolean;
   canModerateComments?: boolean;
+  milestoneStatusOptions?: { value: string; label: string }[];
 }
 
 // Historias 6.12 / 6.13 — Vista del Cliente y del Intermediario. Both roles get
@@ -163,6 +167,7 @@ export function ProjectTabs({
   currentUserId = null,
   canCreateComments = true,
   canModerateComments = false,
+  milestoneStatusOptions = [],
 }: Props) {
   const tabs = visibleTabsForRole(role);
   type TabId = (typeof tabs)[number]["id"];
@@ -308,6 +313,7 @@ export function ProjectTabs({
           milestones={milestones as unknown as MilestoneRow[]}
           projectId={projectId}
           canManage={canManageMilestones}
+          statusOptions={milestoneStatusOptions}
         />
       )}
 
@@ -337,6 +343,9 @@ export function ProjectTabs({
           currentUserId={currentUserId}
           canComment={canCreateComments}
           canModerate={canModerateComments}
+          canUploadFiles={canUploadFiles}
+          canDeleteFiles={canDeleteFiles}
+          canDownloadFiles={canDownloadFiles}
         />
       )}
 
@@ -444,12 +453,18 @@ function CommentsTab({
   currentUserId,
   canComment,
   canModerate,
+  canUploadFiles,
+  canDeleteFiles,
+  canDownloadFiles,
 }: {
   projectId: string;
   comments: CommentRow[];
   currentUserId: string | null;
   canComment: boolean;
   canModerate: boolean;
+  canUploadFiles: boolean;
+  canDeleteFiles: boolean;
+  canDownloadFiles: boolean;
 }) {
   const threads = buildThreads(comments);
 
@@ -470,12 +485,12 @@ function CommentsTab({
         <ol aria-label="Project comments" className="relative ml-3 space-y-4 border-l border-hairline pl-6">
           {threads.map((thread) => (
             <li key={thread.id} className="space-y-3">
-              <CommentCard projectId={projectId} comment={thread} currentUserId={currentUserId} canModerate={canModerate} canComment={canComment} />
+              <CommentCard projectId={projectId} comment={thread} currentUserId={currentUserId} canModerate={canModerate} canComment={canComment} canUploadFiles={canUploadFiles} canDeleteFiles={canDeleteFiles} canDownloadFiles={canDownloadFiles} />
               {thread.replies.length > 0 && (
                 <ul className="space-y-3 pl-6">
                   {thread.replies.map((reply) => (
                     <li key={reply.id}>
-                      <CommentCard projectId={projectId} comment={reply} currentUserId={currentUserId} canModerate={canModerate} canComment={canComment} />
+                      <CommentCard projectId={projectId} comment={reply} currentUserId={currentUserId} canModerate={canModerate} canComment={canComment} canUploadFiles={canUploadFiles} canDeleteFiles={canDeleteFiles} canDownloadFiles={canDownloadFiles} />
                     </li>
                   ))}
                 </ul>
@@ -494,12 +509,18 @@ function CommentCard({
   currentUserId,
   canModerate,
   canComment,
+  canUploadFiles,
+  canDeleteFiles,
+  canDownloadFiles,
 }: {
   projectId: string;
   comment: CommentRow;
   currentUserId: string | null;
   canModerate: boolean;
   canComment: boolean;
+  canUploadFiles: boolean;
+  canDeleteFiles: boolean;
+  canDownloadFiles: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
@@ -574,7 +595,7 @@ function CommentCard({
           onCancel={() => setIsEditing(false)}
         />
       ) : (
-        <p className="mt-2 whitespace-pre-line break-words text-body-sm text-body">{comment.message}</p>
+        <CommentBody value={comment.message} mentions={extractMentionStrings(comment.message)} />
       )}
 
       {error && (
@@ -582,6 +603,15 @@ function CommentCard({
           {error}
         </p>
       )}
+
+      <CommentReactions entityType="project" commentId={comment.id} />
+
+      <CommentAttachments
+        commentId={comment.id}
+        canUpload={canUploadFiles}
+        canDownload={canDownloadFiles}
+        canDelete={canDeleteFiles}
+      />
 
       {canComment && !isEditing && (
         <button
@@ -635,7 +665,7 @@ function NewCommentForm({
     <form action={activeFormAction} className="flex flex-col gap-3">
       <input type="hidden" name="project_id" value={projectId} />
       {parentCommentId && <input type="hidden" name="parent_comment_id" value={parentCommentId} />}
-      <FormTextarea label={parentCommentId ? "Your reply" : "Message"} name="message" required />
+      <MentionTextarea label={parentCommentId ? "Your reply" : "Message"} name="message" required />
       {activeState?.error && <p role="alert" className="text-body-sm text-error">{activeState.error}</p>}
       <div>
         <Button type="submit" disabled={activeIsPending} className="w-full sm:w-auto">
@@ -672,7 +702,7 @@ function EditCommentForm({
     <form action={formAction} className="mt-3 flex flex-col gap-3">
       <input type="hidden" name="comment_id" value={comment.id} />
       <input type="hidden" name="project_id" value={projectId} />
-      <FormTextarea label="Message" name="message" defaultValue={comment.message} required />
+      <MentionTextarea label="Message" name="message" defaultValue={comment.message} required />
       {state?.error && <p role="alert" className="text-body-sm text-error">{state.error}</p>}
       <div className="flex gap-3">
         <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">Cancel</Button>
@@ -684,21 +714,35 @@ function EditCommentForm({
   );
 }
 
+// Historia 8.1 — compact milestone summary on the project tabs. Full management
+// (table, timeline, task assignment, indicators) lives on the milestones page;
+// this section reuses the same shared form modal so flows cannot diverge.
 function MilestonesSection({
   milestones,
   projectId,
   canManage,
+  statusOptions,
 }: {
   milestones: MilestoneRow[];
   projectId: string;
   canManage: boolean;
+  statusOptions: { value: string; label: string }[];
 }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<MilestoneRow | null>(null);
+  const router = useRouter();
 
   return (
     <div className="space-y-4">
-      {canManage && <div className="flex justify-end"><Button onClick={() => setShowForm(true)}>Add Milestone</Button></div>}
+      <div className="flex items-center justify-between">
+        <Link
+          href={`/dashboard/projects/${projectId}/milestones`}
+          className="text-caption-uppercase text-primary hover:underline"
+        >
+          View all milestones
+        </Link>
+        {canManage && <div className="flex justify-end"><Button onClick={() => setShowForm(true)}>Add Milestone</Button></div>}
+      </div>
       {milestones.length === 0 ? (
         <p className="text-body-sm text-muted-soft py-8 text-center">No milestones yet.</p>
       ) : (
@@ -720,51 +764,23 @@ function MilestonesSection({
           ))}
         </div>
       )}
-      {showForm && <MilestoneFormModal projectId={projectId} onClose={() => setShowForm(false)} onSuccess={() => setShowForm(false)} />}
-      {editing && <MilestoneFormModal item={editing} projectId={projectId} onClose={() => setEditing(null)} onSuccess={() => setEditing(null)} />}
-    </div>
-  );
-}
-
-function MilestoneFormModal({ item, projectId, onClose, onSuccess }: {
-  item?: MilestoneRow; projectId: string; onClose: () => void; onSuccess: () => void;
-}) {
-  const action = item ? updateMilestone : createMilestone;
-  const [state, formAction, isPending] = useActionState(action, null);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>{item ? "Edit" : "Create"} Milestone</CardTitle>
-          <button onClick={onClose} className="text-muted hover:text-body-strong text-lg leading-none">&times;</button>
-        </CardHeader>
-        <CardContent>
-          {state?.success ? (
-            <div className="space-y-4"><p className="text-body-sm text-success">{state.success}</p><Button onClick={onSuccess} variant="secondary" className="w-full">Done</Button></div>
-          ) : (
-            <form action={formAction} className="flex flex-col gap-4">
-              {item && <input type="hidden" name="id" value={item.id} />}
-              <input type="hidden" name="project_id" value={projectId} />
-              <FormField label="Title" name="title" defaultValue={item?.title} required />
-              <FormTextarea label="Description" name="description" />
-              <FormField label="Target Date" name="estimated_date" type="date" defaultValue={item?.estimated_date?.split("T")[0] || ""} />
-              {item && <FormField label="Progress %" name="completion_percentage" type="number" min="0" max="100" defaultValue={String(item.completion_percentage)} />}
-              {item && (
-                <FormSelect label="Status" name="status" options={[
-                  { value: "Pending", label: "Pending" }, { value: "In Progress", label: "In Progress" },
-                  { value: "Completed", label: "Completed" },
-                ]} defaultValue={item.status} />
-              )}
-              {state?.error && <p className="text-body-sm text-error">{state.error}</p>}
-              <div className="flex gap-3">
-                <Button type="button" variant="secondary" onClick={onClose} className="flex-1">Cancel</Button>
-                <Button type="submit" disabled={isPending} className="flex-1">{isPending ? "Saving..." : item ? "Update" : "Create"}</Button>
-              </div>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+      {showForm && (
+        <MilestoneFormModal
+          projectId={projectId}
+          statusOptions={statusOptions}
+          onClose={() => setShowForm(false)}
+          onSuccess={() => { setShowForm(false); router.refresh(); }}
+        />
+      )}
+      {editing && (
+        <MilestoneFormModal
+          item={editing}
+          projectId={projectId}
+          statusOptions={statusOptions}
+          onClose={() => setEditing(null)}
+          onSuccess={() => { setEditing(null); router.refresh(); }}
+        />
+      )}
     </div>
   );
 }

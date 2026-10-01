@@ -26,6 +26,13 @@ export type TaskStatus =
   | "Completed"
   | "Cancelled";
 
+export type MilestoneStatus =
+  | "Pending"
+  | "In Progress"
+  | "In Review"
+  | "Completed"
+  | "Cancelled";
+
 export type Priority = "Very Low" | "Low" | "Medium" | "High" | "Critical" | "Urgent";
 
 export type EntityType = "Project" | "Task" | "Comment" | "User" | "Milestone";
@@ -125,6 +132,24 @@ export interface Task {
   position: number;
   weight: number;
   task_type: string;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  is_active: boolean;
+}
+
+export interface Milestone {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  estimated_date: string | null;
+  completed_date: string | null;
+  status: string;
+  completion_percentage: number;
+  sort_order: number;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
