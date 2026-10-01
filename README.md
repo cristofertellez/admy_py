@@ -52,6 +52,30 @@ R2_BUCKET_NAME=your-bucket-name
 1. Create a new Turso database: `turso db create <database-name>`
 2. Apply the migrations in `turso/migrations/`
 
+```bash
+npm run db:migrate
+```
+
+### Seed Demo Data
+
+Populate an **empty** database with coherent demo data (users, clients,
+projects, milestones, tasks, comments, tags and activity) so the dashboard
+renders meaningful KPIs and charts.
+
+```bash
+npm run db:seed
+```
+
+- Demo users are created with the password `Demo1234!`.
+- The script **aborts** if the database already contains data. To wipe demo
+  records and reseed, use:
+
+```bash
+npm run db:seed -- --reset --yes
+```
+
+> Never run the seed against a production database.
+
 ### Development
 
 ```bash

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint app/ proxy.ts constants/ types/ utils/ lib/",
     "db:migrate": "node --env-file=.env.local scripts/apply-migrations.mjs",
+    "db:seed": "node --env-file=.env.local scripts/seed-demo.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {
