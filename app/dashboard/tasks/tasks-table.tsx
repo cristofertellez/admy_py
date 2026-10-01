@@ -18,7 +18,6 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { ColumnDef, RowSelectionState, SortingState } from "@tanstack/react-table";
-import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants";
 import { getAllowedTaskStatusOptions } from "@/features/tasks/task-status";
 
 const STATUS_BADGE_VARIANT: Record<string, "default" | "success" | "error" | "warning"> = {
@@ -72,6 +71,8 @@ interface TasksTableProps {
   assigneeOptions: AssigneeOption[];
   projectOptions?: ProjectOption[];
   projectId?: string;
+  statusOptions: { value: string; label: string }[];
+  priorityOptions: { value: string; label: string }[];
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
@@ -94,6 +95,8 @@ export function TasksTable({
   assigneeOptions,
   projectOptions = [],
   projectId,
+  statusOptions,
+  priorityOptions,
   canCreate,
   canUpdate,
   canDelete,
@@ -176,7 +179,7 @@ export function TasksTable({
   function handleBulkStatusChange() {
     if (!bulkStatus || selectedTasks.length === 0) return;
     const count = selectedTasks.length;
-    const label = TASK_STATUS_OPTIONS.find((option) => option.value === bulkStatus)?.label ?? bulkStatus;
+    const label = statusOptions.find((option) => option.value === bulkStatus)?.label ?? bulkStatus;
     if (!window.confirm(`Set ${count} ${count === 1 ? "task" : "tasks"} to "${label}"?`)) {
       return;
     }
@@ -375,7 +378,7 @@ export function TasksTable({
             className="h-10 rounded-md border border-hairline bg-surface-card px-3 py-2 text-body-sm text-body-strong focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           >
             <option value="">Change status to…</option>
-            {TASK_STATUS_OPTIONS.map((option) => (
+            {statusOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -399,7 +402,7 @@ export function TasksTable({
             className="h-10 w-full rounded-md border border-hairline bg-surface-card px-3 py-2 text-body-sm text-body-strong focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           >
             <option value="">All statuses</option>
-            {TASK_STATUS_OPTIONS.map((option) => (
+            {statusOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -417,7 +420,7 @@ export function TasksTable({
             className="h-10 w-full rounded-md border border-hairline bg-surface-card px-3 py-2 text-body-sm text-body-strong focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           >
             <option value="">All priorities</option>
-            {TASK_PRIORITY_OPTIONS.map((option) => (
+            {priorityOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -500,6 +503,8 @@ export function TasksTable({
           projectId={projectId}
           projectOptions={projectOptions}
           assigneeOptions={assigneeOptions}
+          statusOptions={statusOptions}
+          priorityOptions={priorityOptions}
           onClose={() => setShowCreate(false)}
           onSuccess={() => {
             setShowCreate(false);
@@ -514,6 +519,8 @@ export function TasksTable({
           projectId={projectId}
           projectOptions={projectOptions}
           assigneeOptions={assigneeOptions}
+          statusOptions={statusOptions}
+          priorityOptions={priorityOptions}
           onClose={() => setEditingTask(null)}
           onSuccess={() => {
             setEditingTask(null);
@@ -530,6 +537,8 @@ function TaskFormModal({
   projectId,
   projectOptions = [],
   assigneeOptions,
+  statusOptions,
+  priorityOptions,
   onClose,
   onSuccess,
 }: {
@@ -537,6 +546,8 @@ function TaskFormModal({
   projectId?: string;
   projectOptions?: ProjectOption[];
   assigneeOptions: AssigneeOption[];
+  statusOptions: { value: string; label: string }[];
+  priorityOptions: { value: string; label: string }[];
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -604,13 +615,13 @@ function TaskFormModal({
                 <FormSelect
                   label="Status"
                   name="status"
-                  options={item ? getAllowedTaskStatusOptions(item.status) : TASK_STATUS_OPTIONS}
+                  options={item ? getAllowedTaskStatusOptions(item.status) : statusOptions}
                   defaultValue={item?.status || "Pending"}
                 />
                 <FormSelect
                   label="Priority"
                   name="priority"
-                  options={TASK_PRIORITY_OPTIONS}
+                  options={priorityOptions}
                   defaultValue={item?.priority || "Medium"}
                 />
               </div>

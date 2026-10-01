@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { PRIORITIES, TASK_STATUSES } from "@/constants";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -56,8 +55,10 @@ const taskBaseSchema = z.object({
     .nullable()
     .transform((value) => value || null),
   assigned_to: optionalUuid,
-  status: z.enum(Object.values(TASK_STATUSES) as [string, ...string[]]).default("Pending"),
-  priority: z.enum(Object.values(PRIORITIES) as [string, ...string[]]).default("Medium"),
+  // Status/priority are validated at the action layer against the configured
+  // catalogs (Historia 15.15), so custom statuses added in settings are accepted.
+  status: z.string().min(1, "Status is required.").default("Pending"),
+  priority: z.string().min(1, "Priority is required.").default("Medium"),
   estimated_hours: z.coerce
     .number({ invalid_type_error: "Estimated hours must be a number." })
     .min(0, "Estimated hours cannot be negative.")
@@ -103,7 +104,7 @@ export const bulkUpdateTaskStatusSchema = z.object({
     .array(z.string().uuid("Invalid task."))
     .min(1, "Select at least one task.")
     .max(100, "Too many tasks selected."),
-  status: z.enum(Object.values(TASK_STATUSES) as [string, ...string[]]),
+  status: z.string().min(1, "Status is required."),
 });
 
 export type BulkUpdateTaskStatusInput = z.infer<typeof bulkUpdateTaskStatusSchema>;

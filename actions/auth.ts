@@ -7,6 +7,7 @@ import { query, queryOne, newId } from "@/lib/turso/client";
 import { hashPassword, generateResetToken } from "@/lib/auth/password";
 import { ActivityService } from "@/services/activity.service";
 import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema } from "@/schemas/auth";
+import { SettingsService } from "@/features/settings";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -58,7 +59,10 @@ export async function login(_prevState: unknown, formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+
+  const defaultPage = await SettingsService.getValue("default_page");
+  const target = typeof defaultPage === "string" && defaultPage.startsWith("/") ? defaultPage : "/dashboard";
+  redirect(target);
 }
 
 export async function signup(_prevState: unknown, formData: FormData) {

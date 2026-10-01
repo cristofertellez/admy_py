@@ -14,7 +14,6 @@ import {
 import { useEffect, useState, useTransition } from "react";
 import { useQueuedFormAction } from "@/hooks/use-queued-form-action";
 import { useDebounce } from "@/hooks/use-debounce";
-import { PROJECT_PRIORITY_OPTIONS, PROJECT_STATUS_OPTIONS } from "@/constants";
 import { getAllowedProjectStatusOptions } from "@/features/projects/project-status";
 import type { RowSelectionState, ColumnDef } from "@tanstack/react-table";
 import type { ProjectWithRelations } from "@/features/projects/projects.types";
@@ -161,6 +160,8 @@ interface ProjectsTableProps {
   clientOptions: { id: string; company_name: string }[];
   intermediaryOptions: { id: string; first_name: string; last_name: string }[];
   tagOptions: { id: string; name: string; color: string | null }[];
+  statusOptions: { value: string; label: string }[];
+  priorityOptions: { value: string; label: string }[];
   canCreate: boolean;
   canUpdate: boolean;
 }
@@ -174,6 +175,8 @@ export function ProjectsTable({
   clientOptions,
   intermediaryOptions,
   tagOptions,
+  statusOptions,
+  priorityOptions,
   canCreate,
   canUpdate,
 }: ProjectsTableProps) {
@@ -317,7 +320,7 @@ export function ProjectsTable({
             className="h-10 w-full rounded-md border border-hairline bg-surface-card px-3 py-2 text-body-sm text-body-strong focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           >
             <option value="">All statuses</option>
-            {PROJECT_STATUS_OPTIONS.map((option) => (
+            {statusOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -335,7 +338,7 @@ export function ProjectsTable({
             className="h-10 w-full rounded-md border border-hairline bg-surface-card px-3 py-2 text-body-sm text-body-strong focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           >
             <option value="">All priorities</option>
-            {PROJECT_PRIORITY_OPTIONS.map((option) => (
+            {priorityOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -406,6 +409,8 @@ export function ProjectsTable({
           clientOptions={clientOptions}
           intermediaryOptions={intermediaryOptions}
           tagOptions={tagOptions}
+          allStatusOptions={statusOptions}
+          allPriorityOptions={priorityOptions}
           onClose={() => setShowCreate(false)}
           onSuccess={() => {
             setShowCreate(false);
@@ -420,6 +425,8 @@ export function ProjectsTable({
           clientOptions={clientOptions}
           intermediaryOptions={intermediaryOptions}
           tagOptions={tagOptions}
+          allStatusOptions={statusOptions}
+          allPriorityOptions={priorityOptions}
           onClose={() => setEditingProject(null)}
           onSuccess={() => {
             setEditingProject(null);
@@ -436,6 +443,8 @@ function ProjectFormModal({
   clientOptions = [],
   intermediaryOptions = [],
   tagOptions = [],
+  allStatusOptions,
+  allPriorityOptions,
   onClose,
   onSuccess,
 }: {
@@ -443,6 +452,8 @@ function ProjectFormModal({
   clientOptions?: { id: string; company_name: string }[];
   intermediaryOptions?: { id: string; first_name: string; last_name: string }[];
   tagOptions?: { id: string; name: string; color: string | null }[];
+  allStatusOptions: { value: string; label: string }[];
+  allPriorityOptions: { value: string; label: string }[];
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -453,10 +464,11 @@ function ProjectFormModal({
   );
 
   // On edit the status list is limited to valid transitions from the current
-  // status (Historia 6.4); the server re-validates authoritatively.
+  // status (Historia 6.4); the server re-validates authoritatively. Otherwise it
+  // reflects the configured catalog (Historia 15.15).
   const statusOptions = project
     ? getAllowedProjectStatusOptions(project.status)
-    : PROJECT_STATUS_OPTIONS;
+    : allStatusOptions;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -515,7 +527,7 @@ function ProjectFormModal({
               />
               <div className="grid grid-cols-2 gap-4">
                 <FormSelect label="Status" name="status" options={statusOptions} defaultValue={project?.status || "Proposed"} />
-                <FormSelect label="Priority" name="priority" options={PROJECT_PRIORITY_OPTIONS} defaultValue={project?.priority || "Medium"} />
+                <FormSelect label="Priority" name="priority" options={allPriorityOptions} defaultValue={project?.priority || "Medium"} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Start Date" name="estimated_start_date" type="date" defaultValue={project?.estimated_start_date ?? ""} />

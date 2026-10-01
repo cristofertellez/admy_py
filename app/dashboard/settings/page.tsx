@@ -1,7 +1,7 @@
 import { requirePermission } from "@/lib/auth";
-import { query } from "@/lib/turso/client";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
-import { SettingsForm } from "./settings-form";
+import { SettingsService } from "@/features/settings";
+import { SETTING_CATEGORIES, getSettingDefault } from "@/features/settings/settings.definition";
+import { SettingsPanel } from "./settings-panel";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -9,32 +9,26 @@ export const metadata: Metadata = { title: "Settings" };
 export default async function SettingsPage() {
   await requirePermission("settings.read");
 
-  const settings = await query<{ key: string; value: string }>(
-    "SELECT key, value FROM settings ORDER BY key",
-  );
+  const stored = await SettingsService.getMap();
 
-  const settingsMap: Record<string, string> = {};
-  settings.forEach((s) => {
-    settingsMap[s.key] = s.value;
-  });
+  const initialValues: Record<string, unknown> = {};
+  for (const category of SETTING_CATEGORIES) {
+    for (const setting of category.settings) {
+      initialValues[setting.key] =
+        stored[setting.key] !== undefined ? stored[setting.key] : getSettingDefault(setting.key);
+    }
+  }
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="max-w-5xl space-y-6">
       <div>
         <h1 className="text-display-sm text-ink">Settings</h1>
         <p className="mt-1 text-body-sm text-muted">
-          Configure platform-wide settings.
+          Configure platform-wide settings, preferences and catalogs.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>General Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SettingsForm initialValues={settingsMap} />
-        </CardContent>
-      </Card>
+      <SettingsPanel initialValues={initialValues} />
     </div>
   );
 }

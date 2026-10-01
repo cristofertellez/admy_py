@@ -2,6 +2,8 @@
 
 import { TasksService } from "@/features/tasks";
 import { assertTaskStatusTransition } from "@/features/tasks/task-status";
+import { isValidCatalogValue } from "@/features/settings";
+import { TASK_STATUSES, PRIORITIES } from "@/constants";
 import { notifyTaskCreated } from "@/features/notifications";
 import { requirePermission } from "@/lib/auth";
 import { ActivityService } from "@/services/activity.service";
@@ -14,6 +16,14 @@ type ActionState = { success?: string; error?: string };
 
 function firstFieldError(error: z.ZodError): string {
   return Object.values(error.flatten().fieldErrors).flat()[0] || "Invalid data.";
+}
+
+// Guards status/priority against the configured catalogs (Historia 15.15).
+async function assertTaskCatalogStatusPriority(status: string, priority: string): Promise<boolean> {
+  return (
+    (await isValidCatalogValue("task_statuses", status, Object.values(TASK_STATUSES))) &&
+    (await isValidCatalogValue("task_priorities", priority, Object.values(PRIORITIES)))
+  );
 }
 
 function parseTaskForm<T extends z.ZodTypeAny>(schema: T, formData: FormData) {
@@ -41,6 +51,10 @@ export async function createTask(_prevState: unknown, formData: FormData): Promi
   const parsed = parseTaskForm(taskSchema, formData);
   if (!parsed.success) {
     return { error: firstFieldError(parsed.error) };
+  }
+
+  if (!(await assertTaskCatalogStatusPriority(parsed.data.status, parsed.data.priority))) {
+    return { error: "Invalid status or priority." };
   }
 
   try {
@@ -95,6 +109,10 @@ export async function updateTask(_prevState: unknown, formData: FormData): Promi
   const parsed = parseTaskForm(taskUpdateSchema, formData);
   if (!parsed.success) {
     return { error: firstFieldError(parsed.error) };
+  }
+
+  if (!(await assertTaskCatalogStatusPriority(parsed.data.status, parsed.data.priority))) {
+    return { error: "Invalid status or priority." };
   }
 
   try {
@@ -175,6 +193,10 @@ export async function createSubtask(_prevState: unknown, formData: FormData): Pr
   const parsed = parseTaskForm(taskSchema, formData);
   if (!parsed.success) {
     return { error: firstFieldError(parsed.error) };
+  }
+
+  if (!(await assertTaskCatalogStatusPriority(parsed.data.status, parsed.data.priority))) {
+    return { error: "Invalid status or priority." };
   }
 
   try {
@@ -337,6 +359,10 @@ export async function bulkUpdateTaskStatus(ids: string[], status: string): Promi
   const parsed = bulkUpdateTaskStatusSchema.safeParse({ ids, status });
   if (!parsed.success) {
     return { error: firstFieldError(parsed.error) };
+  }
+
+  if (!(await isValidCatalogValue("task_statuses", status, Object.values(TASK_STATUSES)))) {
+    return { error: "Invalid status." };
   }
 
   let succeeded = 0;

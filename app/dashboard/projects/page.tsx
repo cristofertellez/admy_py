@@ -3,6 +3,7 @@ import { ClientsService } from "@/features/clients";
 import { TagsService } from "@/features/tags";
 import { requirePermission, hasPermission } from "@/lib/auth";
 import { PROJECT_PRIORITY_OPTIONS, PROJECT_STATUS_OPTIONS } from "@/constants";
+import { getCatalogOptions } from "@/features/settings";
 import { ProjectsTable } from "./projects-table";
 import type { Metadata } from "next";
 
@@ -31,8 +32,13 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const params = await searchParams;
 
   const search = params.search?.trim() || undefined;
-  const status = pickOption(params.status, PROJECT_STATUS_OPTIONS);
-  const priority = pickOption(params.priority, PROJECT_PRIORITY_OPTIONS);
+
+  // Historia 15.15: status/priority options come from the configured catalogs
+  // (falling back to the built-in constants) so filters and forms reflect config.
+  const statusOptions = await getCatalogOptions("project_statuses", PROJECT_STATUS_OPTIONS);
+  const priorityOptions = await getCatalogOptions("project_priorities", PROJECT_PRIORITY_OPTIONS);
+  const status = pickOption(params.status, statusOptions);
+  const priority = pickOption(params.priority, priorityOptions);
   const active =
     params.active === "true" || params.active === "false" ? params.active === "true" : undefined;
   const page = Math.max(1, Number.parseInt(params.page || "1", 10) || 1);
@@ -94,6 +100,8 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
           name: tag.name,
           color: tag.color,
         }))}
+        statusOptions={statusOptions}
+        priorityOptions={priorityOptions}
         canCreate={canCreate}
         canUpdate={canUpdate}
       />

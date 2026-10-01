@@ -1,4 +1,4 @@
-import type { Task, TaskStatus, Priority } from "@/types";
+import type { Task } from "@/types";
 
 export interface TaskWithRelations extends Task {
   project_name?: string;
@@ -17,8 +17,10 @@ export interface TaskFilters {
   search?: string;
   projectId?: string;
   assignedTo?: string;
-  status?: TaskStatus;
-  priority?: Priority;
+  // Status and priority are catalog-driven (Historia 15.15), so they accept
+  // arbitrary configured strings rather than a closed enum.
+  status?: string;
+  priority?: string;
   parentTaskId?: string;
   // When true, lists soft-deleted (archived) tasks instead of active ones.
   archived?: boolean;

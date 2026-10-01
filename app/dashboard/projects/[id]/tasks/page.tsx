@@ -4,6 +4,7 @@ import { UsersService } from "@/features/users";
 import { TasksTable } from "@/app/dashboard/tasks/tasks-table";
 import { requirePermission, hasPermission } from "@/lib/auth";
 import { PAGINATION, TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants";
+import { getCatalogOptions } from "@/features/settings";
 import type { Metadata } from "next";
 
 interface Props {
@@ -36,8 +37,12 @@ export default async function ProjectTasksPage({ params, searchParams }: Props) 
   const query = await searchParams;
 
   const search = query.search?.trim() || undefined;
-  const status = pickOption(query.status, TASK_STATUS_OPTIONS);
-  const priority = pickOption(query.priority, TASK_PRIORITY_OPTIONS);
+
+  // Historia 15.15: status/priority options reflect the configured catalogs.
+  const statusOptions = await getCatalogOptions("task_statuses", TASK_STATUS_OPTIONS);
+  const priorityOptions = await getCatalogOptions("task_priorities", TASK_PRIORITY_OPTIONS);
+  const status = pickOption(query.status, statusOptions);
+  const priority = pickOption(query.priority, priorityOptions);
   const sort = pickOption(query.sort, SORT_OPTIONS);
   const order = query.order === "desc" ? "desc" : query.order === "asc" ? "asc" : undefined;
   const page = Math.max(1, Number.parseInt(query.page || "1", 10) || 1);
@@ -78,6 +83,8 @@ export default async function ProjectTasksPage({ params, searchParams }: Props) 
         pageSize={PAGINATION.DEFAULT_PAGE_SIZE}
         assigneeOptions={assignees}
         projectId={id}
+        statusOptions={statusOptions}
+        priorityOptions={priorityOptions}
         canCreate={hasPermission(actor, "tasks.create")}
         canUpdate={hasPermission(actor, "tasks.update")}
         canDelete={hasPermission(actor, "tasks.delete")}

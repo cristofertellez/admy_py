@@ -3,6 +3,8 @@
 import { ProjectsService } from "@/features/projects";
 import { assertProjectStatusTransition } from "@/features/projects/project-status";
 import { TagsService } from "@/features/tags";
+import { isValidCatalogValue } from "@/features/settings";
+import { PROJECT_STATUSES, PRIORITIES } from "@/constants";
 import { notifyProjectCompleted, notifyProjectUpdated } from "@/features/notifications";
 import { requirePermission } from "@/lib/auth";
 import { ActivityService } from "@/services/activity.service";
@@ -41,9 +43,16 @@ function parseProjectForm<T extends z.ZodTypeAny>(schema: T, formData: FormData)
 export async function createProject(_prevState: unknown, formData: FormData): Promise<ActionState> {
   const actor = await requirePermission("projects.create");
 
-  const parsed = parseProjectForm(projectSchema, formData);
+const parsed = parseProjectForm(projectSchema, formData);
   if (!parsed.success) {
     return { error: firstFieldError(parsed.error) };
+  }
+
+  if (
+    !(await isValidCatalogValue("project_statuses", parsed.data.status, Object.values(PROJECT_STATUSES))) ||
+    !(await isValidCatalogValue("project_priorities", parsed.data.priority, Object.values(PRIORITIES)))
+  ) {
+    return { error: "Invalid status or priority." };
   }
 
   try {
@@ -96,9 +105,16 @@ export async function updateProject(_prevState: unknown, formData: FormData): Pr
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Missing project ID." };
 
-  const parsed = parseProjectForm(projectUpdateSchema, formData);
+const parsed = parseProjectForm(projectUpdateSchema, formData);
   if (!parsed.success) {
     return { error: firstFieldError(parsed.error) };
+  }
+
+  if (
+    !(await isValidCatalogValue("project_statuses", parsed.data.status, Object.values(PROJECT_STATUSES))) ||
+    !(await isValidCatalogValue("project_priorities", parsed.data.priority, Object.values(PRIORITIES)))
+  ) {
+    return { error: "Invalid status or priority." };
   }
 
   try {

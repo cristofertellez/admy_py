@@ -3,9 +3,9 @@
 @theme inline {
   --color-canvas: #0f0f0f;
   --color-canvas-deep: #000000;
-  --color-primary: #0007cd;
-  --color-primary-active: #0005a3;
-  --color-primary-glow: #1a26ff;
+  --color-primary: var(--primary, #0007cd);
+  --color-primary-active: var(--primary-active, #0005a3);
+  --color-primary-glow: var(--primary-glow, #1a26ff);
   --color-accent-cyan: #00d4ff;
   --color-accent-violet: #7b3aed;
   --color-surface-card: #181818;

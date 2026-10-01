@@ -4,6 +4,7 @@ export const ADMIN_ONLY_ROUTES = [
   "/dashboard/roles",
   "/dashboard/activity",
   "/dashboard/settings",
+  "/dashboard/templates",
 ] as const;
 
 export const ADMIN_ROLES = [

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PROJECT_STATUSES, PRIORITIES, MAX_TAGS_PER_PROJECT } from "@/constants";
+import { MAX_TAGS_PER_PROJECT } from "@/constants";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -34,8 +34,10 @@ const projectBaseSchema = z.object({
     .optional()
     .nullable()
     .transform((value) => value || null),
-  status: z.enum(Object.values(PROJECT_STATUSES) as [string, ...string[]]).default("Proposed"),
-  priority: z.enum(Object.values(PRIORITIES) as [string, ...string[]]).default("Medium"),
+  // Status/priority are validated at the action layer against the configured
+  // catalogs (Historia 15.15), so custom statuses added in settings are accepted.
+  status: z.string().min(1, "Status is required.").default("Proposed"),
+  priority: z.string().min(1, "Priority is required.").default("Medium"),
   estimated_start_date: optionalDate,
   estimated_end_date: optionalDate,
   estimated_hours: z.coerce

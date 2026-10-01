@@ -118,6 +118,11 @@ export function DashboardSidebar({ role, userId }: DashboardSidebarProps) {
                 Settings
               </NavItem>
             )}
+            {canAccessRoute("/dashboard/templates", role) && (
+              <NavItem href="/dashboard/templates" pathname={pathname}>
+                Templates
+              </NavItem>
+            )}
             <div className="my-2 border-t border-hairline" />
             <NavItem href="/dashboard/profile" pathname={pathname}>
               Profile
