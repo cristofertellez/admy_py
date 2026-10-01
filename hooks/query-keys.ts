@@ -24,6 +24,9 @@ export const queryKeys = {
     all: ["comments"] as const,
     byProject: (projectId: string) => ["comments", "project", projectId] as const,
     byTask: (taskId: string) => ["comments", "task", taskId] as const,
+    byMilestone: (milestoneId: string) => ["comments", "milestone", milestoneId] as const,
+    reactions: (entityType: string, commentId: string) =>
+      ["comments", "reactions", entityType, commentId] as const,
   },
   dashboard: {
     all: ["dashboard"] as const,

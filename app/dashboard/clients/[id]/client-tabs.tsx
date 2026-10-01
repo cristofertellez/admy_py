@@ -281,6 +281,9 @@ export function ClientTabs({
           currentUserId={currentUserId}
           canComment={canCreateComments}
           canModerate={canModerateComments}
+          canUploadFiles={canUploadFiles}
+          canDeleteFiles={canDeleteFiles}
+          canDownloadFiles={canDownloadFiles}
         />
       )}
 

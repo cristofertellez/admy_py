@@ -5,4 +5,6 @@ export {
   notifyProjectCompleted,
   notifyCommentCreated,
   notifyTaskCreated,
+  notifyMentioned,
+  notifyFileUploaded,
 } from "./notification-triggers";

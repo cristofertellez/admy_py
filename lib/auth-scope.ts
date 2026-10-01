@@ -19,7 +19,7 @@ export function isAccessDeniedError(error: unknown): error is AccessDeniedError 
   return error instanceof AccessDeniedError;
 }
 
-const SCOPED_ENTITY_TYPES = new Set(["project", "task", "milestone", "client"]);
+const SCOPED_ENTITY_TYPES = new Set(["project", "task", "milestone", "client", "comment"]);
 
 async function requireUser(): Promise<SessionProfile> {
   const user = await getUser();
@@ -107,6 +107,21 @@ export async function projectScope(column: string): Promise<ScopeClause> {
   return projectVisibilityClause(column, user);
 }
 
+async function milestoneVisibilityClause(column: string, user: SessionProfile): Promise<ScopeClause> {
+  if (isFullAccessUser(user)) return { sql: "", args: [] };
+
+  const { sql, args } = visibleProjectsFragment(user);
+  return {
+    sql: `${column} IN (SELECT m.id FROM milestones m WHERE m.deleted_at IS NULL AND m.project_id IN ${sql})`,
+    args,
+  };
+}
+
+export async function milestoneScope(column: string): Promise<ScopeClause> {
+  const user = await requireUser();
+  return milestoneVisibilityClause(column, user);
+}
+
 export async function clientScope(column: string): Promise<ScopeClause> {
   const user = await requireUser();
   return clientVisibilityClause(column, user);
@@ -124,16 +139,38 @@ export async function attachmentScope(
   const tasksInProjects = `(SELECT t.id FROM tasks t WHERE t.deleted_at IS NULL AND t.project_id IN ${projects.sql})`;
   const milestonesInProjects = `(SELECT m.id FROM milestones m WHERE m.deleted_at IS NULL AND m.project_id IN ${projects.sql})`;
 
-  const args: InValue[] = [...clients.args, ...projects.args, ...projects.args, ...projects.args];
+  // Fragments are emitted in the exact order their SQL placeholders appear so
+  // the flattened args array stays aligned with the final WHERE clause.
+  const clientFragment = { sql: clients.sql, args: clients.args };
+  const projectFragment = { sql: projects.sql, args: projects.args };
 
-  const sql = `(
-    (${entityTypeColumn} = 'client' AND ${entityIdColumn} IN ${clients.sql})
-    OR (${entityTypeColumn} = 'project' AND ${entityIdColumn} IN ${projects.sql})
-    OR (${entityTypeColumn} = 'task' AND ${entityIdColumn} IN ${tasksInProjects})
-    OR (${entityTypeColumn} = 'milestone' AND ${entityIdColumn} IN ${milestonesInProjects})
-  )`;
+  const commentFragments = [
+    `SELECT pc.id FROM project_comments pc WHERE pc.deleted_at IS NULL AND pc.project_id IN ${projects.sql}`,
+    `SELECT tc.id FROM task_comments tc JOIN tasks t ON t.id = tc.task_id WHERE tc.deleted_at IS NULL AND t.project_id IN ${projects.sql}`,
+    `SELECT mc.id FROM milestone_comments mc JOIN milestones m ON m.id = mc.milestone_id WHERE mc.deleted_at IS NULL AND m.project_id IN ${projects.sql}`,
+    `SELECT cc.id FROM client_comments cc WHERE cc.deleted_at IS NULL AND cc.client_id IN ${clients.sql}`,
+  ];
 
-  return { sql, args };
+  const conditions: string[] = [
+    `${entityTypeColumn} = 'client' AND ${entityIdColumn} IN ${clientFragment.sql}`,
+    `${entityTypeColumn} = 'project' AND ${entityIdColumn} IN ${projectFragment.sql}`,
+    `${entityTypeColumn} = 'task' AND ${entityIdColumn} IN ${tasksInProjects}`,
+    `${entityTypeColumn} = 'milestone' AND ${entityIdColumn} IN ${milestonesInProjects}`,
+    `${entityTypeColumn} = 'comment' AND ${entityIdColumn} IN (${commentFragments.join(" UNION ALL ")})`,
+  ];
+
+  const args: InValue[] = [
+    ...clientFragment.args,
+    ...projectFragment.args,
+    ...projectFragment.args,
+    ...projectFragment.args,
+    ...projectFragment.args,
+    ...projectFragment.args,
+    ...projectFragment.args,
+    ...clientFragment.args,
+  ];
+
+  return { sql: `(${conditions.join("\n    OR ")})`, args };
 }
 
 export async function assertProjectVisible(projectId: string, user?: SessionProfile): Promise<void> {
@@ -226,9 +263,33 @@ export async function assertEntityVisible(
       return assertMilestoneVisible(entityId, actor);
     case "client":
       return assertClientVisible(entityId, actor);
+    case "comment":
+      return assertCommentVisible(entityId, actor);
     default:
       await denyAccess(actor, "You do not have access to this resource.", entityType, entityId);
   }
+}
+
+// A comment's visibility follows its parent entity. Since comments live across
+// four tables (project/task/milestone/client) the parent is resolved by lookup.
+export async function assertCommentVisible(commentId: string, user?: SessionProfile): Promise<void> {
+  const actor = user ?? (await requireUser());
+  if (isFullAccessUser(actor)) return;
+
+  const parent = await queryOne<{ entity_type: string; entity_id: string }>(
+    `SELECT 'project' AS entity_type, project_id AS entity_id FROM project_comments WHERE id = ?
+     UNION ALL SELECT 'task', task_id FROM task_comments WHERE id = ?
+     UNION ALL SELECT 'milestone', milestone_id FROM milestone_comments WHERE id = ?
+     UNION ALL SELECT 'client', client_id FROM client_comments WHERE id = ?
+     LIMIT 1`,
+    [commentId, commentId, commentId, commentId],
+  );
+
+  if (!parent) {
+    await denyAccess(actor, "You do not have access to this comment.", "Comment", commentId);
+  }
+
+  await assertEntityVisible(parent!.entity_type, parent!.entity_id, actor);
 }
 
 export function isScopedEntityType(entityType: string): boolean {

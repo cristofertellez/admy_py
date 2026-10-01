@@ -116,6 +116,32 @@ export async function notifyCommentCreated(input: {
   });
 }
 
+export async function notifyMentioned(input: {
+  mentionedUserIds: string[];
+  authorId: string;
+  commentPreview: string;
+  entityType: string;
+  entityId: string;
+}): Promise<void> {
+  await safeExecute(async () => {
+    await Promise.all(
+      input.mentionedUserIds
+        .filter((userId) => userId !== input.authorId)
+        .map((userId) =>
+          NotificationsService.create({
+            receiver_id: userId,
+            title: "You were mentioned",
+            message: input.commentPreview.slice(0, 200),
+            type: "comment_created",
+            entity_type: input.entityType,
+            entity_id: input.entityId,
+            sender_id: input.authorId,
+          }),
+        ),
+    );
+  });
+}
+
 export async function notifyTaskCreated(taskId: string, actorId: string): Promise<void> {
   await safeExecute(async () => {
     const task = await queryOne<{ title: string; project_id: string }>(
@@ -134,4 +160,22 @@ export async function notifyTaskCreated(taskId: string, actorId: string): Promis
       dedupe_key: `task_created:${taskId}`,
     }));
   });
+}
+
+export async function notifyFileUploaded(input: {
+  projectId: string;
+  actorId: string;
+  filename: string;
+}): Promise<void> {
+  await safeExecute(() =>
+    notifyProjectRecipients(input.projectId, input.actorId, (projectName) => ({
+      title: "File uploaded",
+      message: `"${input.filename}" was added to "${projectName}".`,
+      type: "project_updated",
+      entity_type: "Project",
+      entity_id: input.projectId,
+      sender_id: input.actorId,
+      dedupe_key: `file_uploaded:${input.projectId}:${input.filename}`,
+    })),
+  );
 }

@@ -107,6 +107,71 @@ export class UsersService {
     );
   }
 
+  // Resolve @mention handles to active user ids (Historia 9.6).
+  // A handle matches the email prefix or the lowercase "firstlast" name.
+  static async resolveMentionHandles(handles: string[]): Promise<{ handle: string; user_id: string }[]> {
+    const uniqueHandles = [...new Set(handles.map((h) => h.toLowerCase()))];
+    if (uniqueHandles.length === 0) return [];
+
+    const allUsers = await query<{ id: string; first_name: string; last_name: string; email: string }>(
+      `SELECT id, first_name, last_name, email FROM users WHERE deleted_at IS NULL AND is_active = 1`,
+    );
+
+    const resolve = (email: string, first_name: string, last_name: string): Set<string> => {
+      const candidates = new Set<string>();
+      const emailPrefix = email.split("@")[0]?.toLowerCase();
+      if (emailPrefix) candidates.add(emailPrefix);
+      const name = `${first_name ?? ""}${last_name ?? ""}`.toLowerCase().replace(/\s+/g, "");
+      if (name) candidates.add(name);
+      candidates.add(`${first_name ?? ""}`.toLowerCase().replace(/\s+/g, ""));
+      return candidates;
+    };
+
+    const desired = new Set(uniqueHandles);
+    const result: { handle: string; user_id: string }[] = [];
+
+    for (const user of allUsers) {
+      if (desired.size === 0) break;
+      const candidates = resolve(user.email, user.first_name, user.last_name);
+      for (const handle of desired) {
+        if (candidates.has(handle)) {
+          result.push({ handle, user_id: user.id });
+          desired.delete(handle);
+          break;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  // Candidate users for @mention autocomplete (Historia 9.6).
+  // Returns the exposed handle and display name for active users, ordered by name.
+  static async listMentionCandidates(search: string): Promise<{ handle: string; label: string }[]> {
+    const term = search.toLowerCase();
+    const rows = await query<{ id: string; first_name: string; last_name: string; email: string }>(
+      `SELECT id, first_name, last_name, email
+       FROM users
+       WHERE deleted_at IS NULL AND is_active = 1
+       ORDER BY first_name ASC, last_name ASC
+       LIMIT 50`,
+    );
+
+    const candidates: { handle: string; label: string }[] = [];
+    for (const user of rows) {
+      const fullName = `${user.first_name} ${user.last_name}`.trim();
+      const emailPrefix = user.email.split("@")[0];
+      const handle = `${user.first_name}${user.last_name}`.toLowerCase().replace(/\s+/g, "") || emailPrefix;
+
+      const haystack = `${fullName} ${emailPrefix} ${handle}`.toLowerCase();
+      if (term && !haystack.includes(term)) continue;
+
+      candidates.push({ handle, label: fullName });
+    }
+
+    return candidates;
+  }
+
   static async create(input: {
     first_name: string;
     last_name: string;

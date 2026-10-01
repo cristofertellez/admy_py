@@ -1,19 +1,18 @@
 "use client";
 
 import {
-  createClientCommentAction,
-  deleteClientCommentAction,
-  updateClientCommentAction,
+  createMilestoneCommentAction,
+  deleteMilestoneCommentAction,
+  updateMilestoneCommentAction,
 } from "@/actions/comments";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/shared/card";
 import { MentionTextarea } from "@/components/forms";
 import { CommentBody, extractMentionStrings } from "@/components/shared/comment-body";
 import { CommentReactions } from "@/components/shared/comment-reactions";
 import { CommentAttachments } from "@/components/shared/comment-attachments";
 import { useActionState, useState, useTransition } from "react";
 
-export interface ClientCommentRow {
+export interface MilestoneCommentRow {
   id: string;
   parent_comment_id: string | null;
   message: string;
@@ -24,8 +23,8 @@ export interface ClientCommentRow {
 }
 
 interface Props {
-  clientId: string;
-  comments: ClientCommentRow[];
+  milestoneId: string;
+  comments: MilestoneCommentRow[];
   currentUserId: string | null;
   canComment: boolean;
   canModerate: boolean;
@@ -34,11 +33,11 @@ interface Props {
   canDownloadFiles: boolean;
 }
 
-interface ThreadNode extends ClientCommentRow {
-  replies: ClientCommentRow[];
+interface ThreadNode extends MilestoneCommentRow {
+  replies: MilestoneCommentRow[];
 }
 
-function buildThreads(comments: ClientCommentRow[]): ThreadNode[] {
+function buildThreads(comments: MilestoneCommentRow[]): ThreadNode[] {
   const roots: ThreadNode[] = [];
   const byId = new Map<string, ThreadNode>();
 
@@ -58,15 +57,15 @@ function buildThreads(comments: ClientCommentRow[]): ThreadNode[] {
 }
 
 function canEditComment(
-  comment: Pick<ClientCommentRow, "user_id">,
+  comment: Pick<MilestoneCommentRow, "user_id">,
   currentUserId: string | null,
   canModerate: boolean,
 ): boolean {
   return !!currentUserId && (canModerate || comment.user_id === currentUserId);
 }
 
-export function CommentsTab({
-  clientId,
+export function MilestoneComments({
+  milestoneId,
   comments,
   currentUserId,
   canComment,
@@ -78,44 +77,35 @@ export function CommentsTab({
   const threads = buildThreads(comments);
 
   return (
-    <div className="space-y-6">
-      {canComment ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Add Comment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <NewCommentForm clientId={clientId} />
-          </CardContent>
-        </Card>
-      ) : null}
+    <div className="space-y-4">
+      {canComment ? <NewCommentForm milestoneId={milestoneId} /> : null}
 
       {comments.length === 0 ? (
-        <p className="rounded-xl border border-hairline bg-surface-card px-4 py-8 text-center text-body-sm text-muted-soft">
-          No comments yet.
-        </p>
+        <p className="text-body-sm text-muted-soft">No comments yet.</p>
       ) : (
-        <ol aria-label="Client comments" className="relative space-y-4 border-l border-hairline pl-6 ml-3">
+        <ol aria-label="Milestone comments" className="relative space-y-3 border-l border-hairline pl-5">
           {threads.map((thread) => (
             <li key={thread.id} className="space-y-3">
               <CommentCard
-                clientId={clientId}
+                milestoneId={milestoneId}
                 comment={thread}
                 currentUserId={currentUserId}
                 canModerate={canModerate}
+                canComment={canComment}
                 canUploadFiles={canUploadFiles}
                 canDeleteFiles={canDeleteFiles}
                 canDownloadFiles={canDownloadFiles}
               />
               {thread.replies.length > 0 && (
-                <ul className="space-y-3 pl-6">
+                <ul className="space-y-3 pl-5">
                   {thread.replies.map((reply) => (
                     <li key={reply.id}>
                       <CommentCard
-                        clientId={clientId}
+                        milestoneId={milestoneId}
                         comment={reply}
                         currentUserId={currentUserId}
                         canModerate={canModerate}
+                        canComment={canComment}
                         canUploadFiles={canUploadFiles}
                         canDeleteFiles={canDeleteFiles}
                         canDownloadFiles={canDownloadFiles}
@@ -133,18 +123,20 @@ export function CommentsTab({
 }
 
 function CommentCard({
-  clientId,
+  milestoneId,
   comment,
   currentUserId,
   canModerate,
+  canComment,
   canUploadFiles,
   canDeleteFiles,
   canDownloadFiles,
 }: {
-  clientId: string;
-  comment: ClientCommentRow;
+  milestoneId: string;
+  comment: MilestoneCommentRow;
   currentUserId: string | null;
   canModerate: boolean;
+  canComment: boolean;
   canUploadFiles: boolean;
   canDeleteFiles: boolean;
   canDownloadFiles: boolean;
@@ -168,7 +160,7 @@ function CommentCard({
     setError(null);
     setIsBusy(true);
     startTransition(async () => {
-      const result = await deleteClientCommentAction(comment.id, clientId);
+      const result = await deleteMilestoneCommentAction(comment.id, milestoneId);
       setIsBusy(false);
       if (result?.error) setError(result.error);
     });
@@ -193,7 +185,7 @@ function CommentCard({
         </time>
         {comment.is_edited && <span className="text-caption text-muted">(edited)</span>}
         <div className="ml-auto flex items-center gap-2">
-          {canEditComment(comment, currentUserId, canModerate) && !isEditing && (
+          {editable && !isEditing && (
             <button
               onClick={() => setIsEditing(true)}
               disabled={isBusy}
@@ -216,7 +208,7 @@ function CommentCard({
 
       {isEditing ? (
         <EditCommentForm
-          clientId={clientId}
+          milestoneId={milestoneId}
           comment={comment}
           onDone={() => setIsEditing(false)}
           onCancel={() => setIsEditing(false)}
@@ -231,7 +223,7 @@ function CommentCard({
         </p>
       )}
 
-      <CommentReactions entityType="client" commentId={comment.id} />
+      <CommentReactions entityType="milestone" commentId={comment.id} />
 
       <CommentAttachments
         commentId={comment.id}
@@ -240,7 +232,7 @@ function CommentCard({
         canDelete={canDeleteFiles}
       />
 
-      {!isEditing && (
+      {canComment && !isEditing && (
         <button
           onClick={() => setIsReplying((v) => !v)}
           className="mt-2 text-caption-uppercase text-muted transition-colors hover:text-primary"
@@ -251,7 +243,11 @@ function CommentCard({
 
       {isReplying && (
         <div className="mt-3">
-          <NewCommentForm clientId={clientId} parentCommentId={comment.id} onDone={() => setIsReplying(false)} />
+          <NewCommentForm
+            milestoneId={milestoneId}
+            parentCommentId={comment.id}
+            onDone={() => setIsReplying(false)}
+          />
         </div>
       )}
     </article>
@@ -259,15 +255,15 @@ function CommentCard({
 }
 
 function NewCommentForm({
-  clientId,
+  milestoneId,
   parentCommentId,
   onDone,
 }: {
-  clientId: string;
+  milestoneId: string;
   parentCommentId?: string;
   onDone?: () => void;
 }) {
-  const [state, formAction, isPending] = useActionState(createClientCommentAction, null);
+  const [state, formAction, isPending] = useActionState(createMilestoneCommentAction, null);
 
   if (state?.success) {
     return (
@@ -284,7 +280,7 @@ function NewCommentForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
-      <input type="hidden" name="client_id" value={clientId} />
+      <input type="hidden" name="milestone_id" value={milestoneId} />
       {parentCommentId && <input type="hidden" name="parent_comment_id" value={parentCommentId} />}
       <MentionTextarea label={parentCommentId ? "Your reply" : "Message"} name="message" required />
       {state?.error && (
@@ -300,17 +296,17 @@ function NewCommentForm({
 }
 
 function EditCommentForm({
-  clientId,
+  milestoneId,
   comment,
   onDone,
   onCancel,
 }: {
-  clientId: string;
-  comment: ClientCommentRow;
+  milestoneId: string;
+  comment: MilestoneCommentRow;
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [state, formAction, isPending] = useActionState(updateClientCommentAction, null);
+  const [state, formAction, isPending] = useActionState(updateMilestoneCommentAction, null);
 
   if (state?.success) {
     return (
@@ -326,7 +322,7 @@ function EditCommentForm({
   return (
     <form action={formAction} className="mt-3 flex flex-col gap-3">
       <input type="hidden" name="comment_id" value={comment.id} />
-      <input type="hidden" name="client_id" value={clientId} />
+      <input type="hidden" name="milestone_id" value={milestoneId} />
       <MentionTextarea label="Message" name="message" defaultValue={comment.message} required />
       {state?.error && (
         <p role="alert" className="text-body-sm text-error">{state.error}</p>

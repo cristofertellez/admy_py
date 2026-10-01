@@ -4,6 +4,8 @@ import { ChecklistsService } from "@/features/checklists";
 import { TagsService } from "@/features/tags";
 import { TimeEntriesService } from "@/features/time-entries";
 import { UsersService } from "@/features/users";
+import { getCatalogOptions } from "@/features/settings";
+import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants";
 import { ActivityTimeline } from "@/app/dashboard/activity/activity-timeline";
 import { getUser, hasPermission } from "@/lib/auth";
 import { isAccessDeniedError } from "@/lib/auth-scope";
@@ -70,6 +72,11 @@ export default async function TaskDetailPage({ params }: Props) {
     users: (entry.users as { first_name: string; last_name: string } | null) ?? null,
   }));
 
+  const [statusOptions, priorityOptions] = await Promise.all([
+    getCatalogOptions("task_statuses", TASK_STATUS_OPTIONS),
+    getCatalogOptions("task_priorities", TASK_PRIORITY_OPTIONS),
+  ]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -117,6 +124,8 @@ export default async function TaskDetailPage({ params }: Props) {
         tags={tags}
         taskTags={taskTags}
         assigneeOptions={assignees}
+        statusOptions={statusOptions}
+        priorityOptions={priorityOptions}
         userId={user?.id}
         canCreateTasks={user ? hasPermission(user, "tasks.create") : false}
         canUpdateTasks={user ? hasPermission(user, "tasks.update") : false}

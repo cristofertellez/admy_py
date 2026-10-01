@@ -19,3 +19,11 @@ export function useTaskComments(taskId: string) {
     enabled: !!taskId,
   });
 }
+
+export function useMilestoneComments(milestoneId: string) {
+  return useQuery({
+    queryKey: queryKeys.comments.byMilestone(milestoneId),
+    queryFn: () => CommentsService.listByMilestone(milestoneId),
+    enabled: !!milestoneId,
+  });
+}

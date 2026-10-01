@@ -1,8 +1,7 @@
 export { useClients, useClient } from "./use-clients";
 export { useProjects, useProject } from "./use-projects";
 export { useTasks, useTask } from "./use-tasks";
-export { useDeveloperDashboard } from "./use-dashboard";
-export { useProjectComments, useTaskComments } from "./use-comments";
+export { useProjectComments, useTaskComments, useMilestoneComments } from "./use-comments";
 export { useDebounce } from "./use-debounce";
 export { useConnectivity } from "./use-connectivity";
 export {

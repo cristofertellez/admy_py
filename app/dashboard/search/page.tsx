@@ -13,6 +13,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: string }> = {
   task: { label: "Task", icon: "T" },
   client: { label: "Client", icon: "C" },
   milestone: { label: "Milestone", icon: "M" },
+  comment: { label: "Comment", icon: "Cm" },
 };
 
 const STATUS_COLORS: Record<string, "success" | "error" | "warning" | "default"> = {

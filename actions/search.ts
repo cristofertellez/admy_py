@@ -3,10 +3,11 @@
 import { query } from "@/lib/turso/client";
 import { getUser } from "@/lib/auth";
 import { clientScope, projectScope } from "@/lib/auth-scope";
+import { CommentsService } from "@/features/comments";
 
 export interface SearchResult {
   id: string;
-  type: "project" | "task" | "client" | "milestone";
+  type: "project" | "task" | "client" | "milestone" | "comment";
   title: string;
   subtitle: string;
   url: string;
@@ -131,6 +132,26 @@ export async function globalSearch(
           status: m.status as string,
         });
       }
+    }
+
+    const commentRows = await CommentsService.search(searchTerm, 5);
+
+    const commentUrlByType: Record<string, (row: Record<string, unknown>) => string> = {
+      project: (row) => `/dashboard/projects/${row.entity_id}`,
+      milestone: (row) => `/dashboard/projects/${row.project_id ?? ""}`,
+      task: (row) => `/dashboard/tasks/${row.entity_id}`,
+      client: (row) => `/dashboard/clients/${row.entity_id}`,
+    };
+
+    for (const c of commentRows) {
+      const entityType = c.entity_type as string;
+      results.push({
+        id: c.comment_id as string,
+        type: "comment",
+        title: String(c.message).slice(0, 120),
+        subtitle: `${c.author_first_name ?? ""} ${c.author_last_name ?? ""} in ${c.entity_name ?? entityType}`.trim(),
+        url: commentUrlByType[entityType]?.(c) ?? "/dashboard/search",
+      });
     }
 
     return { results };

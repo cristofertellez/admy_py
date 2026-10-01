@@ -6,15 +6,17 @@ import { updateTaskTags } from "@/actions/tags";
 import { Badge } from "@/components/shared/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
-import { FormField, FormSelect, FormTextarea, TagSelector } from "@/components/forms";
+import { FormField, FormSelect, FormTextarea, MentionTextarea, TagSelector } from "@/components/forms";
 import { TagChip } from "@/components/shared/tag-chip";
+import { CommentReactions } from "@/components/shared/comment-reactions";
+import { CommentBody, extractMentionStrings } from "@/components/shared/comment-body";
 import { TimeTracking, type TimeEntryRow } from "./time-tracking";
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTaskCommentAction } from "@/actions/comments";
 import { useQueuedFormAction } from "@/hooks/use-queued-form-action";
 import { getAllowedTaskStatusOptions } from "@/features/tasks/task-status";
-import { TASK_PRIORITY_OPTIONS, TASK_STATUS_OPTIONS } from "@/constants";
+import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants";
 
 interface SubtaskRow {
   id: string; title: string; status: string; priority: string;
@@ -45,6 +47,8 @@ interface Props {
   tags: TagRow[];
   taskTags: TagRow[];
   assigneeOptions?: AssigneeOption[];
+  statusOptions?: { value: string; label: string }[];
+  priorityOptions?: { value: string; label: string }[];
   userId?: string;
   canCreateTasks?: boolean;
   canUpdateTasks?: boolean;
@@ -68,6 +72,8 @@ export function TaskDetail({
   tags,
   taskTags,
   assigneeOptions = [],
+  statusOptions = TASK_STATUS_OPTIONS,
+  priorityOptions = TASK_PRIORITY_OPTIONS,
   canCreateTasks = true,
   canUpdateTasks = true,
   canDeleteTasks = false,
@@ -237,7 +243,8 @@ export function TaskDetail({
                       <span className="text-body-sm font-medium text-body-strong">{c.users?.first_name} {c.users?.last_name}</span>
                       <span className="text-caption text-muted">{new Date(c.created_at).toLocaleDateString()}</span>
                     </div>
-                    <p className="mt-1 text-body-sm text-body">{c.message}</p>
+                    <CommentBody value={c.message} mentions={extractMentionStrings(c.message)} />
+                    <CommentReactions entityType="task" commentId={c.id} />
                   </div>
                 </div>
               ))}
@@ -251,6 +258,8 @@ export function TaskDetail({
           parentTaskId={task.id as string}
           projectId={task.project_id as string}
           assigneeOptions={assigneeOpts}
+          statusOptions={statusOptions}
+          priorityOptions={priorityOptions}
           onClose={() => setShowCreateSubtask(false)}
           onSuccess={() => setShowCreateSubtask(false)}
         />
@@ -262,6 +271,8 @@ export function TaskDetail({
           projectId={task.project_id as string}
           subtask={editingSubtask}
           assigneeOptions={assigneeOpts}
+          statusOptions={statusOptions}
+          priorityOptions={priorityOptions}
           onClose={() => setEditingSubtask(null)}
           onSuccess={() => setEditingSubtask(null)}
         />
@@ -271,6 +282,7 @@ export function TaskDetail({
         <EditTaskModal
           task={task}
           assigneeOptions={assigneeOpts}
+          priorityOptions={priorityOptions}
           onClose={() => setShowEditTask(false)}
           onSuccess={() => setShowEditTask(false)}
         />
@@ -313,7 +325,7 @@ function CommentForm({ taskId }: { taskId: string }) {
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="task_id" value={taskId} />
-      <FormTextarea label="Add a comment" name="message" required />
+      <MentionTextarea label="Add a comment" name="message" required />
       {state?.error && <p className="text-body-sm text-error">{state.error}</p>}
       {state?.success && <p className="text-body-sm text-success">{state.success}</p>}
       <div>
@@ -329,15 +341,17 @@ function CommentForm({ taskId }: { taskId: string }) {
   );
 }
 
-function SubtaskModal({ parentTaskId, projectId, subtask, assigneeOptions, onClose, onSuccess }: {
+function SubtaskModal({ parentTaskId, projectId, subtask, assigneeOptions, statusOptions, priorityOptions, onClose, onSuccess }: {
   parentTaskId: string; projectId: string; subtask?: SubtaskRow;
   assigneeOptions: { value: string; label: string }[]; onClose: () => void; onSuccess: () => void;
+  statusOptions: { value: string; label: string }[];
+  priorityOptions: { value: string; label: string }[];
 }) {
   const action = subtask ? updateTask : createSubtask;
   const { formAction, isPending, state } = useQueuedFormAction(subtask ? "task.update" : null, action);
 
   // Editing offers only the transitions allowed from the current status (Historia 7.5).
-  const statusOpts = subtask ? getAllowedTaskStatusOptions(subtask.status) : TASK_STATUS_OPTIONS;
+  const statusOpts = subtask ? getAllowedTaskStatusOptions(subtask.status) : statusOptions;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -358,7 +372,7 @@ function SubtaskModal({ parentTaskId, projectId, subtask, assigneeOptions, onClo
               <FormTextarea label="Description" name="description" />
               <FormSelect label="Assignee" name="assigned_to" options={assigneeOptions} defaultValue={""} />
               <FormSelect label="Status" name="status" options={statusOpts} defaultValue={subtask?.status || "Pending"} />
-              <FormSelect label="Priority" name="priority" options={TASK_PRIORITY_OPTIONS} defaultValue={subtask?.priority || "Medium"} />
+              <FormSelect label="Priority" name="priority" options={priorityOptions} defaultValue={subtask?.priority || "Medium"} />
               <FormField label="Estimated Hours" name="estimated_hours" type="number" defaultValue={String(subtask?.estimated_hours || 0)} />
               {subtask && (
                 <FormField label="Progress %" name="completion_percentage" type="number" min="0" max="100" defaultValue={String(subtask.completion_percentage)} />
@@ -376,8 +390,9 @@ function SubtaskModal({ parentTaskId, projectId, subtask, assigneeOptions, onClo
   );
 }
 
-function EditTaskModal({ task, assigneeOptions, onClose, onSuccess }: {
+function EditTaskModal({ task, assigneeOptions, priorityOptions, onClose, onSuccess }: {
   task: Record<string, unknown>; assigneeOptions: { value: string; label: string }[];
+  priorityOptions: { value: string; label: string }[];
   onClose: () => void; onSuccess: () => void;
 }) {
   const { formAction, isPending, state } = useQueuedFormAction("task.update", updateTask);
@@ -404,7 +419,7 @@ function EditTaskModal({ task, assigneeOptions, onClose, onSuccess }: {
                 defaultValue={(task.assigned_to as string) || ""}
               />
               <FormSelect label="Status" name="status" options={getAllowedTaskStatusOptions(task.status as string)} defaultValue={(task.status as string) || "Pending"} />
-              <FormSelect label="Priority" name="priority" options={TASK_PRIORITY_OPTIONS} defaultValue={(task.priority as string) || "Medium"} />
+              <FormSelect label="Priority" name="priority" options={priorityOptions} defaultValue={(task.priority as string) || "Medium"} />
               <FormField label="Estimated Hours" name="estimated_hours" type="number" defaultValue={String(task.estimated_hours || 0)} />
               <FormField label="Progress %" name="completion_percentage" type="number" min="0" max="100" defaultValue={String(task.completion_percentage || 0)} />
               <div className="grid grid-cols-2 gap-4">
