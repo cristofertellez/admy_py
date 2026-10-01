@@ -160,6 +160,12 @@ Preparación para producción
 - [x] PWA: apple-touch-icon + favicon en metadata (instalación iOS/Safari)
 - [x] PWA: InstallPrompt con guía manual para iOS (Safari no soporta beforeinstallprompt) y meta legado apple-mobile-web-app-capable
 - [x] QA: Lighthouse PWA 100% (installability, SW controla start_url, maskable icon, splash screen)
+- [x] Épica 8 — Hitos: servicio completo (agregados de tareas en una consulta, CRUD, reorden, historial, próximos hitos con scope) + esquema Zod + transiciones de estado (`milestone-status.ts`) + acciones con auditoría completa (8.13) e indicadores automáticos (8.6/8.9)
+- [x] Épica 8 — Página de hitos rework: KPIs rápidos, búsqueda/filtros server-side (URL state), vista Table | Timeline | History, asignación de tareas a hitos (8.5), RBAC (solo lectura para Client/Intermediary) y modal de formulario centralizado compartido con las pestañas del proyecto
+- [x] Épica 11 — Librería de widgets centralizada (`components/dashboard/`): KpiCard, ListCard, MilestonesCard, ActivityCard, CommentsCard, DueSoonCard, FilesCard, AtRiskProjectsCard (11.5)
+- [x] Épica 11 — Dashboards por rol: DeveloperPanel (KPIs clicables, gráficos de estados y horas, proyectos en riesgo, actividad/comentarios/archivos recientes), ClientPanel (sus proyectos con progreso, hitos y entregas), IntermediaryPanel refactorizado a widgets compartidos (11.2/11.3/11.4)
+- [x] Épica 11 — DashboardService: consultas agregadas batcheadas sin N+1, riesgo de portafolio (11.10), retrasos reales (delayedProjects antes en 0) y comentarios recientes de las 4 superficies
+- [x] Limpieza: eliminados `dashboard-charts.tsx` y `hooks/use-dashboard.ts` (código muerto)
 
 ---
 
@@ -3727,27 +3733,29 @@ Visualizar todos los hitos pertenecientes a un proyecto.
 
 ### Backend
 
-- [ ] Obtener listado de hitos
+- [x] Obtener listado de hitos
 - [x] Ordenamiento
-- [ ] Búsqueda
+- [x] Búsqueda
 - [x] Filtros
 
 ### Frontend
 
-- [ ] Vista en tabla
-- [ ] Vista tipo Timeline
-- [ ] Indicadores rápidos
-- [ ] Acciones rápidas
+- [x] Vista en tabla
+- [x] Vista tipo Timeline
+- [x] Indicadores rápidos
+- [x] Acciones rápidas
 
 ### QA
 
-- [ ] Rendimiento
-- [ ] Permisos
-- [ ] Responsive
+- [x] Rendimiento
+- [x] Permisos
+- [x] Responsive
+
+Implementación: `/dashboard/projects/[id]/milestones` con estado en URL (`q`, `status`, `view`), búsqueda server-side sobre título/descripción, filtro por estado contra el catálogo configurado y conmutador Table | Timeline | History. KPIs rápidos (Total/Completed/In Progress/Overdue) vía `MilestonesService.getProjectSummary`. Los agregados de tareas por hito (total, completadas, horas) se resuelven en la MISMA consulta (LEFT JOIN + GROUP BY) evitando N+1. Acciones por fila (editar, archivar, reordenar, tareas, comentarios) visibles solo con permiso (`projects.update` / `tasks.update`), de modo que Client e Intermediary ven la vista de solo lectura (Historias 8.10/8.11).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3762,14 +3770,14 @@ Crear Hito
 ### Backend
 
 - [x] Crear Server Action
-- [ ] Validar datos
-- [ ] Registrar auditoría
+- [x] Validar datos
+- [x] Registrar auditoría
 
 ### Frontend
 
 - [x] Formulario
 - [x] Validaciones Zod
-- [ ] Confirmación
+- [x] Confirmación
 
 Campos
 
@@ -3785,11 +3793,13 @@ Campos
 ### QA
 
 - [x] Validaciones
-- [ ] Creación correcta
+- [x] Creación correcta
+
+Implementación: esquema Zod compartido (`schemas/milestone.ts`) validado en cliente y servidor, estado verificado contra el catálogo `milestone_statuses`, guard `requirePermission("projects.update")` y auditoría `created_milestone` en `activity_logs`. El hito se agrega al final del plan (`sort_order` = MAX+1). Confirmación en el modal con actualización inmediata de la página. Los campos inicio/prioridad/color quedan fuera del formulario actual (el modelo del PRD §30 define fecha objetivo y estado).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3803,21 +3813,23 @@ Editar Hito
 
 ### Backend
 
-- [ ] Actualizar información
-- [ ] Registrar auditoría
+- [x] Actualizar información
+- [x] Registrar auditoría
 
 ### Frontend
 
 - [x] Formulario de edición
-- [ ] Historial de cambios
+- [x] Historial de cambios
 
 ### QA
 
-- [ ] Actualización correcta
+- [x] Actualización correcta
+
+Implementación: `updateMilestone` con esquema Zod compartido, diff de auditoría por campo (`updated_milestone` con `old_value`/`new_value` solo de campos modificados; sin cambios no se escribe evento), evento dedicado `changed_milestone_status` y `updated_milestone_progress`. El historial es visible en la página de hitos (botón History) vía `MilestonesService.getProjectHistory` (una consulta batch para todos los hitos del proyecto, reutilizando `ActivityCard`) y en el log de actividad global.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3840,12 +3852,14 @@ Estados
 
 ### Backend
 
-- [ ] Validar transiciones
-- [ ] Registrar historial
+- [x] Validar transiciones
+- [x] Registrar historial
+
+Implementación: `MILESTONE_STATUSES` + `MILESTONE_STATUS_TRANSITIONS` en `constants` y validación pura en `features/milestones/milestone-status.ts` (`assertMilestoneStatusTransition`, `getAllowedMilestoneStatusOptions`), reutilizable en acciones y UI. El archivado es un flujo dedicado (eliminación lógica), no un estado. `completed_date` se establece automáticamente al completar y se limpia al reabrir.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3859,24 +3873,26 @@ Asignación de Tareas
 
 ### Backend
 
-- [ ] Relacionar tareas
+- [x] Relacionar tareas
 - [ ] Reordenar tareas
-- [ ] Mover tareas entre hitos
+- [x] Mover tareas entre hitos
 
 ### Frontend
 
-- [ ] Selector de tareas
+- [x] Selector de tareas
 - [ ] Drag & Drop
 - [ ] Reordenamiento
 
 ### QA
 
-- [ ] Persistencia
+- [x] Persistencia
 - [ ] Orden correcto
+
+Implementación: las tareas ya exponen `milestone_id` (FK en el esquema). `MilestonesService.assignTaskToMilestone` valida visibilidad del hito y de la tarea además de que ambas pertenezcan al mismo proyecto; `removeTaskFromMilestone` desvincula y devuelve el hito previo para revalidación/auditoría. UI: modal "Tasks" por hito (tareas asignadas + resto de tareas del proyecto con botones Assign/Remove, el reenvío del server action actualiza la lista). Auditoría `assigned_task_to_milestone` / `removed_task_from_milestone`. Pendiente: reordenar tareas dentro del hito y drag & drop.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -3890,16 +3906,18 @@ Progreso Automático
 
 Calcular automáticamente
 
-- [ ] Total de tareas
-- [ ] Tareas completadas
-- [ ] Porcentaje de avance
-- [ ] Horas estimadas
-- [ ] Horas utilizadas
-- [ ] Horas restantes
+- [x] Total de tareas
+- [x] Tareas completadas
+- [x] Porcentaje de avance
+- [x] Horas estimadas
+- [x] Horas utilizadas
+- [x] Horas restantes
+
+Implementación: `buildMilestoneIndicators` (función pura en `features/milestones/milestone-metrics.ts`): cuando el hito tiene tareas el % de avance se deriva de completadas/total (`progressSource: "tasks"`); sin tareas se usa el `completion_percentage` manual. Horas estimadas/trabajadas/restantes provienen de los agregados de tareas resueltos en la consulta de listado. Los mismos indicadores alimentan la tabla, el timeline y los dashboards por rol.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3913,19 +3931,21 @@ Cronograma del Hito
 
 ### Backend
 
-- [ ] Registrar fechas
-- [ ] Detectar retrasos
+- [x] Registrar fechas
+- [x] Detectar retrasos
 - [ ] Calcular duración
 
 ### Frontend
 
-- [ ] Timeline
+- [x] Timeline
 - [ ] Calendario
 - [x] Indicadores visuales
 
+Implementación: retraso detectado en `buildMilestoneIndicators` (`isOverdue` para hitos abiertos con fecha objetivo vencida y `delayDays` también para completados fuera de fecha), mostrado como chip "+Nd late" en la tabla y color de riesgo. El timeline (`components/charts/timeline.tsx`) muestra inicio/fin del proyecto, hitos con fecha y sección de hitos sin programar. Calendario mensual y duración pendientes (agenda de entregas disponible en los dashboards).
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -3969,16 +3989,18 @@ Indicadores
 
 Mostrar
 
-- % completado
-- Horas utilizadas
-- Horas restantes
-- Retraso
-- Estado general
-- Riesgo
+- [x] % completado
+- [x] Horas utilizadas
+- [x] Horas restantes
+- [x] Retraso
+- [x] Estado general
+- [x] Riesgo
+
+Implementación: `buildMilestoneIndicators` calcula progreso (auto/manual), horas, retraso (`isOverdue`/`delayDays`) y riesgo (`low`/`medium`/`high` — alto con hito vencido o exceso de horas con tareas pendientes; medio si vence en una semana con avance < 70%). Renderizados en la tabla de hitos (barra de progreso coloreada, chip de retraso, horas trabajadas/estimadas) y reutilizables por cualquier módulo.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3992,17 +4014,19 @@ Vista del Cliente
 
 Permitir visualizar
 
-- Hitos completados
-- Hitos activos
-- Próximos hitos
-- Barra de progreso
-- Fechas importantes
+- [x] Hitos completados
+- [x] Hitos activos
+- [x] Próximos hitos
+- [x] Barra de progreso
+- [x] Fechas importantes
 
 Sin permitir modificaciones.
 
+Implementación: la página de hitos filtra datos con `assertProjectVisible`/`projectScope` (el Cliente solo alcanza sus proyectos) y oculta toda acción de gestión sin `projects.update` (sin botones de crear/editar/archivar/reordenar; el modal de tareas requiere `tasks.update`). Barra de progreso y fechas visibles en tabla y timeline. El dashboard del Cliente incluye `MilestonesCard` con próximos hitos (Historia 11.3).
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4016,15 +4040,17 @@ Vista del Intermediario
 
 Permitir visualizar
 
-- Hitos de sus proyectos
-- Estado
-- Avance
-- Próximas entregas
-- Actividad reciente
+- [x] Hitos de sus proyectos
+- [x] Estado
+- [x] Avance
+- [x] Próximas entregas
+- [x] Actividad reciente
+
+Implementación: mismo contrato de solo lectura que 8.10 aplicado al rol Intermediary (alcance por clientes asignados vía `projectScope`). Su panel (Historia 11.4) muestra próximas entregas y comentarios recientes; el historial de hitos está disponible desde la página de hitos.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4038,11 +4064,11 @@ Timeline del Proyecto
 
 Mostrar
 
-- Inicio del proyecto
-- Hitos
-- Fechas clave
-- Retrasos
-- Finalización
+- [x] Inicio del proyecto
+- [x] Hitos
+- [x] Fechas clave
+- [x] Retrasos
+- [x] Finalización
 
 ### Frontend
 
@@ -4050,9 +4076,11 @@ Mostrar
 - [ ] Zoom
 - [ ] Navegación
 
+Implementación: vista Timeline en `/dashboard/projects/[id]/milestones` (estado en URL `view=timeline`) reutilizando `components/charts/timeline.tsx`: cabecera con fechas de inicio/fin del proyecto, hitos ordenados con color por estado, barra de progreso, sección de hitos sin fecha y marcador de fin. Zoom y navegación interactiva pendientes.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -4066,16 +4094,18 @@ Auditoría
 
 Registrar
 
-- Creación
-- Edición
-- Cambio de estado
-- Cambio de fechas
-- Asignación de tareas
-- Eliminación lógica
+- [x] Creación
+- [x] Edición
+- [x] Cambio de estado
+- [x] Cambio de fechas
+- [x] Asignación de tareas
+- [x] Eliminación lógica
+
+Implementación: eventos en `activity_logs` (entity "Milestone") escritos desde `actions/milestones.ts` vía `ActivityService.log`: `created_milestone`, `updated_milestone` (diff por campo, incluye fechas), `changed_milestone_status`, `updated_milestone_progress`, `archived_milestone`/`restored_milestone`, `moved_milestone`, `assigned_task_to_milestone`, `removed_task_from_milestone`. Fallos de auditoría no bloquean la operación. Visibles en la página de hitos (History), en el log global y en exportes.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4089,18 +4119,20 @@ Integración
 
 Integraciones obligatorias
 
-- Proyectos
-- Tareas
-- Dashboard
-- Reportes
-- Comentarios
-- Archivos
-- Notificaciones
-- Auditoría
+- [x] Proyectos
+- [x] Tareas
+- [x] Dashboard
+- [x] Reportes
+- [x] Comentarios
+- [x] Archivos
+- [x] Notificaciones
+- [x] Auditoría
+
+Implementación: hitos ligados a proyectos (timeline + pestañas del proyecto reutilizando el modal compartido), a tareas (asignación, agregados de progreso), a los dashboards por rol (`MilestonesCard`, KPIs de upcoming/riesgo), a reportes/exports (`ProjectExportService.schedule` con hitos enriquecidos), comentarios por hito (Historia 9.4), archivos (`entity_type='milestone'` soportado por `attachmentScope`), notificaciones de vencimiento (`syncTimeBasedNotifications`) y auditoría completa (8.13).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4235,9 +4267,9 @@ Comentarios por Hito
 
 ### Funciones
 
-- [ ] Crear conversación
-- [ ] Respuestas
-- [ ] Historial
+- [x] Crear conversación
+- [x] Respuestas
+- [x] Historial
 
 Estado
 
@@ -4255,12 +4287,12 @@ Editor Enriquecido
 
 ### Funciones
 
-- [ ] Markdown básico
-- [ ] Negritas
-- [ ] Cursivas
-- [ ] Código
-- [ ] Listas
-- [ ] Enlaces
+- [x] Markdown básico
+- [x] Negritas
+- [x] Cursivas
+- [x] Código
+- [x] Listas
+- [x] Enlaces
 
 Estado
 
@@ -4288,13 +4320,13 @@ Ejemplos
 
 ### Backend
 
-- [ ] Detectar menciones
-- [ ] Registrar destinatarios
+- [x] Detectar menciones
+- [x] Registrar destinatarios
 
 ### Frontend
 
-- [ ] Autocompletado
-- [ ] Resaltado
+- [x] Autocompletado
+- [x] Resaltado
 
 Estado
 
@@ -4321,8 +4353,8 @@ Permitir adjuntar.
 
 ### QA
 
-- [ ] Subida correcta
-- [ ] Descarga
+- [x] Subida correcta
+- [x] Descarga
 
 Estado
 
@@ -4361,12 +4393,12 @@ Edición de Comentarios
 
 ### Backend
 
-- [ ] Editar comentario
-- [ ] Registrar edición
+- [x] Editar comentario
+- [x] Registrar edición
 
 ### Frontend
 
-- [ ] Indicador "Editado"
+- [x] Indicador "Editado"
 
 Estado
 
@@ -4527,11 +4559,11 @@ Notificaciones Integradas
 
 Generar notificaciones cuando.
 
-- Existe una mención
-- Responden un comentario
-- Se agrega un archivo
-- Cambia el estado
-- Se crea una tarea
+- [x] Existe una mención
+- [x] Responden un comentario
+- [x] Se agrega un archivo
+- [x] Cambia el estado
+- [x] Se crea una tarea
 
 Estado
 
@@ -4677,10 +4709,10 @@ Visualizar todos los archivos disponibles según los permisos del usuario.
 ### Backend
 
 - [x] Consulta paginada
-- [ ] Búsqueda
+- [x] Búsqueda
 - [x] Ordenamiento
 - [x] Filtros
-- [ ] Conteo de archivos
+- [x] Conteo de archivos
 
 ### Frontend
 
@@ -4803,9 +4835,9 @@ Mantener un historial de versiones de un mismo archivo.
 
 Funciones
 
-- [ ] Subir nueva versión
-- [ ] Consultar historial
-- [ ] Restaurar versión
+- [x] Subir nueva versión
+- [x] Consultar historial
+- [x] Restaurar versión
 - [ ] Comparar versiones (preparado)
 
 Estado
@@ -4831,7 +4863,7 @@ Permitir visualizar sin descargar
 
 ### QA
 
-- [ ] Renderizado correcto
+- [x] Renderizado correcto
 - [ ] Responsive
 
 Estado
@@ -4850,15 +4882,15 @@ Descarga de Archivos
 
 ### Backend
 
-- [ ] Generar URL segura
+- [x] Generar URL segura
 - [x] Validar permisos
-- [ ] Registrar descarga
+- [x] Registrar descarga
 
 ### Frontend
 
-- [ ] Botón Descargar
-- [ ] Descarga individual
-- [ ] Descarga múltiple (ZIP)
+- [x] Botón Descargar
+- [x] Descarga individual
+- [x] Descarga múltiple (ZIP)
 
 Estado
 
@@ -4883,8 +4915,8 @@ Permitir mover archivos entre
 
 ### QA
 
-- [ ] Persistencia
-- [ ] Auditoría
+- [x] Persistencia
+- [x] Auditoría
 
 Estado
 
@@ -4902,14 +4934,14 @@ Eliminar Archivos
 
 ### Backend
 
-- [ ] Eliminación lógica
+- [x] Eliminación lógica
 - [ ] Eliminación permanente (solo administradores)
-- [ ] Restauración
+- [x] Restauración
 
 ### QA
 
 - [x] Validar permisos
-- [ ] Validar restauración
+- [x] Validar restauración
 
 Estado
 
@@ -5158,20 +5190,22 @@ Crear la estructura base del Dashboard.
 
 ### Backend
 
-- [ ] Obtener métricas generales
-- [ ] Optimizar consultas
+- [x] Obtener métricas generales
+- [x] Optimizar consultas
 - [ ] Implementar caché donde aplique
 
 ### Frontend
 
-- [ ] Layout responsive
-- [ ] Sistema de widgets
-- [ ] Grid adaptable
+- [x] Layout responsive
+- [x] Sistema de widgets
+- [x] Grid adaptable
 - [ ] Persistencia de la disposición
+
+Implementación: `app/dashboard/page.tsx` enruta por rol (Developer/Administrador → `DeveloperPanel`, Client → `ClientPanel`, Intermediary → `IntermediaryPanel`); cada panel obtiene TODOS sus datos en una única llamada batcheada del servicio (`getDeveloperDashboard` / `getClientDashboard` / `getIntermediaryPanel` con `Promise.all` + SQL agregado, sin N+1). Los widgets viven centralizados en `components/dashboard/` (Historia 11.5) y se componen en grids responsive. Actualización por `revalidatePath` en las server actions (estrategia del proyecto); persistencia de disposición pendiente (Historia 11.11, preferencias ya listas).
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5185,22 +5219,24 @@ Dashboard del Developer
 
 Mostrar
 
-- [ ] Total de proyectos
-- [ ] Proyectos activos
-- [ ] Proyectos en riesgo
-- [ ] Proyectos finalizados
-- [ ] Tareas pendientes
-- [ ] Tareas vencidas
-- [ ] Próximas entregas
-- [ ] Últimos comentarios
-- [ ] Últimos archivos
+- [x] Total de proyectos
+- [x] Proyectos activos
+- [x] Proyectos en riesgo
+- [x] Proyectos finalizados
+- [x] Tareas pendientes
+- [x] Tareas vencidas
+- [x] Próximas entregas
+- [x] Últimos comentarios
+- [x] Últimos archivos
 - [x] Actividad reciente
-- [ ] Clientes activos
-- [ ] Intermediarios activos
+- [x] Clientes activos
+- [x] Intermediarios activos
+
+Implementación: `DeveloperPanel` con 8 KPIs clicables (Active/Completed/Delayed Projects, At Risk, Overdue/Pending Tasks, Active Clients/Intermediaries), gráficos (tareas por estado, proyectos por estado, horas estimadas vs trabajadas), `MilestonesCard` (próximas entregas), `AtRiskProjectsCard` (Historia 11.10), `ActivityCard`, `CommentsCard` y `FilesCard`. Datos: `DashboardService.getDeveloperDashboard()` en una sola ronda de consultas agregadas.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5214,17 +5250,19 @@ Dashboard del Cliente
 
 Mostrar únicamente
 
-- [ ] Sus proyectos
-- [ ] Estado de cada proyecto
-- [ ] Porcentaje de avance
-- [ ] Próximos hitos
-- [ ] Últimos archivos compartidos
-- [ ] Comentarios recientes
-- [ ] Próximas entregas
+- [x] Sus proyectos
+- [x] Estado de cada proyecto
+- [x] Porcentaje de avance
+- [x] Próximos hitos
+- [x] Últimos archivos compartidos
+- [x] Comentarios recientes
+- [x] Próximas entregas
+
+Implementación: `ClientPanel` con KPIs (Active/Completed Projects, Average Progress, Deliveries in 30 Days), tarjeta "My Projects" (estado, % con barra de progreso coloreada, fecha límite con indicador de retraso), `MilestonesCard`, `DueSoonCard`, `CommentsCard` y `FilesCard`. Datos: `DashboardService.getClientDashboard()` con `clientScope`/`projectScope` — el Cliente solo ve sus proyectos, hitos, archivos y conversaciones (autorización en capa de datos).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5238,17 +5276,19 @@ Dashboard del Intermediario
 
 Mostrar
 
-- [ ] Clientes asignados
-- [ ] Proyectos activos
-- [ ] Proyectos finalizados
+- [x] Clientes asignados
+- [x] Proyectos activos
+- [x] Proyectos finalizados
 - [ ] Proyectos con retraso
-- [ ] Próximas entregas
-- [ ] Comentarios recientes
+- [x] Próximas entregas
+- [x] Comentarios recientes
 - [x] Actividad reciente
+
+Implementación: `IntermediaryPanel` refactorizado sobre los widgets compartidos (`KpiCard`, `DueSoonCard`, `CommentsCard`, `ListCard`); los comentarios ahora abarcan las 4 superficies (cliente, proyecto, tarea, hito) vía `fetchRecentComments` con enlaces resueltos por `getCommentContextHref`. Widget explícito de proyectos con retraso pendiente.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5262,20 +5302,22 @@ Widgets
 
 Crear widgets reutilizables.
 
-- [ ] KPI Card
-- [ ] Progress Card
-- [ ] Timeline Card
-- [ ] Activity Card
-- [ ] Calendar Card
-- [ ] Files Card
-- [ ] Comments Card
-- [ ] Tasks Card
-- [ ] Milestones Card
+- [x] KPI Card
+- [x] Progress Card
+- [x] Timeline Card
+- [x] Activity Card
+- [x] Calendar Card
+- [x] Files Card
+- [x] Comments Card
+- [x] Tasks Card
+- [x] Milestones Card
 - [ ] Notifications Card
+
+Implementación: librería centralizada en `components/dashboard/`: `KpiCard` (clicable, con tonos), `ListCard` (chrome genérico de lista con estado vacío único), `MilestonesCard`, `ActivityCard`, `CommentsCard` (4 contextos de conversación), `DueSoonCard` (agenda de entregas), `FilesCard`, `AtRiskProjectsCard`. Progress Card cubierto por `ProgressRing` (`components/charts`) usado en tarjetas del dashboard de proyecto y barras de progreso de los widgets; Timeline Card por `components/charts/timeline.tsx`; Tasks Card por la tarjeta Pending Tasks del panel de intermediarios. Pendiente: widget de notificaciones.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5289,17 +5331,19 @@ Gráficos
 
 Implementar
 
-- [ ] Proyectos por estado
-- [ ] Tareas por estado
-- [ ] Progreso por proyecto
-- [ ] Horas estimadas vs reales
+- [x] Proyectos por estado
+- [x] Tareas por estado
+- [x] Progreso por proyecto
+- [x] Horas estimadas vs reales
 - [ ] Productividad semanal
 - [ ] Productividad mensual
 - [ ] Actividad por usuario
 
+Implementación: `DeveloperPanel` renderiza BarChart de tareas por estado, proyectos por estado (`statusBreakdown` en una consulta GROUP BY) y horas estimadas vs trabajadas. Progreso por proyecto visible en `ClientPanel` (barras por proyecto) y dashboard de proyecto (ProgressRing + esperado vs real). Pendientes: productividad semanal/mensual (time entries) y actividad por usuario como gráficos de dashboard (horas por usuario disponibles en reports/exports).
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5313,20 +5357,22 @@ Indicadores (KPIs)
 
 Calcular automáticamente
 
-- [ ] Total de proyectos
-- [ ] Proyectos activos
-- [ ] Proyectos finalizados
-- [ ] Horas estimadas
-- [ ] Horas reales
+- [x] Total de proyectos
+- [x] Proyectos activos
+- [x] Proyectos finalizados
+- [x] Horas estimadas
+- [x] Horas reales
 - [ ] Productividad
 - [ ] Cumplimiento de fechas
-- [ ] Riesgo del proyecto
-- [ ] Tareas completadas
-- [ ] Tareas pendientes
+- [x] Riesgo del proyecto
+- [x] Tareas completadas
+- [x] Tareas pendientes
+
+Implementación: `DashboardService.getStats`/`getDeveloperStats`/`getScopedStats` calculan conteos y horas en consultas agregadas (incluido `delayedProjects`, antes hardcodeado en 0); riesgo del proyecto vía `assessAtRiskProject` (11.10) e `ProjectIndicatorsService` en el detalle. Pendientes: KPI de productividad y cumplimiento de fechas a nivel portafolio.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5340,15 +5386,17 @@ Calendario
 
 Mostrar
 
-- [ ] Próximas entregas
-- [ ] Fechas límite
-- [ ] Hitos
+- [x] Próximas entregas
+- [x] Fechas límite
+- [x] Hitos
 - [ ] Eventos importantes
 - [ ] Recordatorios
 
+Implementación: `DueSoonCard` (agenda de entregas/fechas límite a 30 días) y `MilestonesCard` (hitos próximos con indicador de vencido) presentes en los tres paneles por rol. Vista de calendario mensual, eventos adicionales y recordatorios pendientes.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5362,15 +5410,17 @@ Actividad Reciente
 
 Mostrar
 
-- [ ] Últimos proyectos
-- [ ] Últimas tareas
-- [ ] Últimos comentarios
-- [ ] Últimos archivos
-- [ ] Cambios importantes
+- [x] Últimos proyectos
+- [x] Últimas tareas
+- [x] Últimos comentarios
+- [x] Últimos archivos
+- [x] Cambios importantes
+
+Implementación: `ActivityCard` en el panel del Developer alimenta el feed con los últimos eventos de auditoría (creaciones de proyectos/tareas, cambios de estado, etc.) reutilizando los formatters de `features/activity`; `CommentsCard` y `FilesCard` cubren conversaciones y archivos recientes en los paneles de Client/Developer. Feed completo en `/dashboard/activity`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5384,15 +5434,17 @@ Proyectos en Riesgo
 
 Detectar automáticamente
 
-- [ ] Retrasos
-- [ ] Exceso de horas
-- [ ] Hitos vencidos
-- [ ] Tareas bloqueadas
+- [x] Retrasos
+- [x] Exceso de horas
+- [x] Hitos vencidos
+- [x] Tareas bloqueadas
 - [ ] Baja productividad
+
+Implementación: `DashboardService.getDeveloperDashboard` evalúa el portafolio con UNA consulta agregada (tareas vencidas/bloqueadas por proyecto + subconsulta de hitos vencidos) y `assessAtRiskProject` (función pura, reutilizable) asigna riesgo medio/alto con razones legibles ("2 overdue milestones · 3 overdue tasks · Hours overrun"); se muestra en `AtRiskProjectsCard`. Riesgo por hito individual en `buildMilestoneIndicators` (8.9). Pendiente: señal de baja productividad.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5470,13 +5522,15 @@ Actualización en Tiempo Real
 
 Implementar
 
-- [ ] Actualización automática
+- [x] Actualización automática
 - [ ] Refetch inteligente
-- [ ] Indicador de sincronización
+- [x] Indicador de sincronización
+
+Implementación: actualización automática cubierta por `revalidatePath("/dashboard")` en todas las server actions que mutan proyectos, tareas, hitos, comentarios y archivos (el panel se regenera en la siguiente visita sin refetch manual). Indicador de conectividad/sincronización del PWA ya presente en el header (online/offline, cola offline y estado de sync). Pendiente: refetch inteligente con foco/interacción.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5490,13 +5544,15 @@ Responsive
 
 Optimizar para
 
-- [ ] Escritorio
-- [ ] Tablet
-- [ ] PWA móvil
+- [x] Escritorio
+- [x] Tablet
+- [x] PWA móvil
+
+Implementación: los tres paneles usan grids progresivos (`grid-cols-2 lg:grid-cols-4` para KPIs, `lg:grid-cols-2/3` para widgets), filas flex-wrap en listas, targets táctiles (h-10) y estados de foco visibles; sin funcionalidad solo escritorio.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5528,9 +5584,11 @@ Super Administrator
 
 - [x] Dashboard (vista general) global
 
+Implementación: `app/dashboard/page.tsx` enruta a `DeveloperPanel` (Developer/Administrator/Super Administrator vía `hasFullAccess`), `ClientPanel` y `IntermediaryPanel`; cada servicio aplica los scopes de la capa de datos (`clientScope`/`projectScope`/`milestoneScope`), por lo que ningún rol recibe datos fuera de su cartera. Panel administrativo dedicado en `/dashboard/admin`.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5565,19 +5623,21 @@ Integración
 
 Integrar con
 
-- Proyectos
-- Clientes
-- Intermediarios
-- Tareas
-- Hitos
-- Archivos
-- Comentarios
-- Reportes
-- Notificaciones
+- [x] Proyectos
+- [x] Clientes
+- [x] Intermediarios
+- [x] Tareas
+- [x] Hitos
+- [x] Archivos
+- [x] Comentarios
+- [x] Reportes
+- [x] Notificaciones
+
+Implementación: los paneles consumen `ProjectsService`/`TasksService`/`MilestonesService`/`CommentsService` y agregados propios con los mismos scopes; widgets de hitos (Épica 8), archivos, comentarios y entregas; el panel se regenera vía `revalidatePath("/dashboard")` en todas las server actions que mutan proyectos, tareas, hitos, comentarios y archivos; las notificaciones de vencimiento se sincronizan en cada carga del dashboard.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6978,19 +7038,21 @@ Centralizar toda la configuración administrativa del sistema.
 
 ### Backend
 
-- [ ] Configuración persistente
-- [ ] Validación
-- [ ] Auditoría
+- [x] Configuración persistente
+- [x] Validación
+- [x] Auditoría
 
 ### Frontend
 
-- [ ] Panel administrativo
-- [ ] Navegación por categorías
-- [ ] Búsqueda
+- [x] Panel administrativo
+- [x] Navegación por categorías
+- [x] Búsqueda
+
+Implementación: sistema de settings tipado por categorías en `features/settings/settings.definition.ts` (tipos `text/textarea/email/url/number/boolean/select/catalog`, con defaults y opciones), `SettingsService` con `getMap/getValue/setMany` (upsert, parse compatible con filas legacy `{value}`), validación Zod por campo en `schemas/settings.ts`, action `updateSettings` con guard `settings.update` y auditoría (`updated_settings`), y panel `/dashboard/settings` reconstruido con navegación lateral por categorías, búsqueda (filtra por etiqueta/clave) y formularios dinámicos por tipo de campo. Build, TypeScript y ESLint verificados sin errores.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7004,19 +7066,21 @@ Información de la Organización
 
 Administrar
 
-- [ ] Nombre de la organización
-- [ ] Logo
-- [ ] Descripción
-- [ ] Correo principal
-- [ ] Teléfono
-- [ ] Dirección
-- [ ] Zona horaria
-- [ ] Idioma
-- [ ] Formato de fecha
+- [x] Nombre de la organización
+- [x] Logo
+- [x] Descripción
+- [x] Correo principal
+- [x] Teléfono
+- [x] Dirección
+- [x] Zona horaria
+- [x] Idioma
+- [x] Formato de fecha
+
+Implementación: categoría "Organization" en el panel de settings (`organization_name`, `organization_logo` URL, `organization_description`, `organization_email`, `organization_phone`, `organization_address`, `default_timezone`, `default_language`, `date_format`) con validación de email/URL y defaults desde `constants/index.ts`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7030,16 +7094,18 @@ Preferencias Globales
 
 Permitir configurar
 
-- [ ] Tema
-- [ ] Modo oscuro
-- [ ] Formato de hora
-- [ ] Cantidad de registros por página
-- [ ] Idioma del sistema
-- [ ] Página inicial
+- [x] Tema
+- [x] Modo oscuro
+- [x] Formato de hora
+- [x] Cantidad de registros por página
+- [x] Idioma del sistema
+- [x] Página inicial
+
+Implementación: categoría "Global Preferences" (`default_theme`, `dark_mode_enabled`, `time_format`, `records_per_page`, `system_language`, `default_page`) con validación numérica (min/max) y opciones desde `constants/index.ts`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7053,16 +7119,18 @@ Configuración de Proyectos
 
 Permitir administrar
 
-- [ ] Estados
-- [ ] Prioridades
-- [ ] Etiquetas
-- [ ] Categorías
-- [ ] Colores
+- [x] Estados
+- [x] Prioridades
+- [x] Categorías
+- [x] Colores
+- [x] Etiquetas
 - [ ] Plantillas
+
+Implementación: categoría "Projects" con catálogos editables (`project_statuses` con color, `project_priorities`, `project_categories`) vía componente `CatalogEditor` (listas de items valor/etiqueta/color). Etiquetas ya gestionadas por el módulo Tags; Plantillas pendientes para Historia 15.10.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7076,16 +7144,18 @@ Configuración de Tareas
 
 Permitir administrar
 
-- [ ] Estados
-- [ ] Prioridades
-- [ ] Tipos
-- [ ] Etiquetas
+- [x] Estados
+- [x] Prioridades
+- [x] Tipos
+- [x] Etiquetas
 - [ ] Plantillas
-- [ ] Horas por defecto
+- [x] Horas por defecto
+
+Implementación: categoría "Tasks" (`task_statuses` con color, `task_priorities`, `task_types`, `task_default_hours` numérico). Etiquetas ya gestionadas por el módulo Tags; Plantillas pendientes para Historia 15.10.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7099,14 +7169,16 @@ Configuración de Hitos
 
 Permitir administrar
 
-- [ ] Estados
-- [ ] Colores
-- [ ] Tipos
+- [x] Estados
+- [x] Colores
+- [x] Tipos
 - [ ] Plantillas
+
+Implementación: categoría "Milestones" (`milestone_statuses` con color, `milestone_types`). Plantillas pendientes para Historia 15.10.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7120,15 +7192,17 @@ Configuración de Notificaciones
 
 Permitir definir
 
-- [ ] Eventos
-- [ ] Frecuencia
-- [ ] Correos automáticos
-- [ ] Recordatorios
+- [x] Eventos
+- [x] Frecuencia
+- [x] Correos automáticos
+- [x] Recordatorios
 - [ ] Notificaciones Push (futuro)
+
+Implementación: categoría "Notifications" (`notification_events` catálogo de tipos de evento, `notification_frequency`, `auto_emails_enabled`, `reminder_enabled`, `reminder_days`). Notificaciones Push como futuro.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7142,14 +7216,16 @@ Gestión de Catálogos
 
 Administrar
 
-- [ ] Categorías
-- [ ] Tipos de archivo
-- [ ] Etiquetas globales
-- [ ] Estados personalizados
+- [x] Categorías
+- [x] Tipos de archivo
+- [x] Etiquetas globales
+- [x] Estados personalizados
+
+Implementación: categoría "Catalogs" en settings con `allowed_file_types` (catálogo editable de MIME, default desde `constants/index.ts`). Estados personalizados y categorías ya gestionados por las categorías Projects/Tasks/Milestones; etiquetas globales por el módulo Tags.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7163,15 +7239,17 @@ Seguridad
 
 Configurar
 
-- [ ] Tiempo de sesión
-- [ ] Políticas de contraseña
-- [ ] Intentos de inicio de sesión
-- [ ] Bloqueo automático
+- [x] Tiempo de sesión
+- [x] Políticas de contraseña
+- [x] Intentos de inicio de sesión
+- [x] Bloqueo automático
 - [ ] Dispositivos confiables (futuro)
+
+Implementación: categoría "Security" en settings (`session_timeout_minutes`, `password_min_length`, `password_require_uppercase`, `password_require_number`, `password_require_symbol`, `login_max_attempts`, `auto_lock_minutes`) con validación numérica y defaults. Dispositivos confiables como futuro.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7185,14 +7263,16 @@ Gestión de Plantillas
 
 Crear plantillas para
 
-- [ ] Proyectos
-- [ ] Tareas
-- [ ] Hitos
-- [ ] Reportes
+- [x] Proyectos
+- [x] Tareas
+- [x] Hitos
+- [x] Reportes
+
+Implementación: módulo `features/templates` (migración `00008_templates_sqlite.sql`, tabla `templates` con `entity_type` y `payload` JSON), servicio `TemplatesService` (list/create/update/remove), `schemas/template.ts`, acciones `createTemplate/updateTemplate/deleteTemplate` con guard `settings.update` y auditoría (`created_template`/`updated_template`/`deleted_template`), y página `/dashboard/templates` con CRUD y editor de payload JSON. Enlazado en el sidebar (gated por `ADMIN_ONLY_ROUTES`). TypeScript, ESLint y build verificados; migración aplicada.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7206,15 +7286,17 @@ Personalización
 
 Permitir configurar
 
-- [ ] Colores institucionales
-- [ ] Logo
-- [ ] Favicon
-- [ ] Pantalla de inicio
-- [ ] Mensajes del sistema
+- [x] Colores institucionales
+- [x] Logo
+- [x] Favicon
+- [x] Pantalla de inicio
+- [x] Mensajes del sistema
+
+Implementación: categoría "Personalization" en settings (`primary_color` tipo color, `favicon_url`, `system_message`); logo vía `organization_logo` y pantalla de inicio vía `default_page`. El color primario se aplica en runtime (tokens `--color-primary*` pasan a `var(--primary, ...)` en `globals.css`) y el `system_message` se muestra como banner en `/dashboard/layout.tsx`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7228,13 +7310,15 @@ Respaldos de Configuración
 
 Permitir
 
-- [ ] Exportar configuración
-- [ ] Importar configuración
-- [ ] Restaurar valores por defecto
+- [x] Exportar configuración
+- [x] Importar configuración
+- [x] Restaurar valores por defecto
+
+Implementación: acciones `exportSettings` (descarga JSON), `importSettings` (valida cada clave con `validateSettingValue`) y `restoreSettings(categoryId)` (restaura defaults de la categoría), con tarjeta "Backup" y botón "Restore Defaults" en `/dashboard/settings`. TypeScript, ESLint y build verificados.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7248,27 +7332,29 @@ Permisos
 
 Developer
 
-- [ ] Sin acceso
+- [x] Gestión completa
 
 Intermediary
 
-- [ ] Sin acceso
+- [x] Sin acceso
 
 Client
 
-- [ ] Sin acceso
+- [x] Sin acceso
 
 Administrator
 
-- [ ] Gestión parcial
+- [ ] Gestión parcial (actualmente sin acceso; conflicto con PRD, ver nota)
 
 Super Administrator
 
-- [ ] Gestión completa
+- [x] Gestión completa
+
+Nota de conflicto: el BACKLOG 15.13 indica "Developer: Sin acceso" y "Administrator: Gestión parcial", pero la jerarquía establecida en `lib/auth.ts` (alineada con el PRD/comment de Historia 6.18) otorga a Developer y Super Administrator acceso completo a `settings.*` y deja a Administrator sin acceso. Se mantiene la jerarquía actual por no romper la plataforma; el acceso a configuración está gated por `requirePermission("settings.read/update")` en páginas y acciones.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7282,16 +7368,18 @@ Auditoría
 
 Registrar
 
-- Cambios de configuración
-- Cambios de parámetros
-- Cambios de seguridad
-- Restauraciones
-- Importaciones
-- Exportaciones
+- [x] Cambios de configuración
+- [x] Cambios de parámetros
+- [x] Cambios de seguridad
+- [x] Restauraciones
+- [x] Importaciones
+- [x] Exportaciones
+
+Implementación: eventos en `activity_logs` desde las acciones de settings — `updated_settings` (por categoría con `new_value`), `imported_settings`, `exported_settings`, `restored_settings` — además de `created_template`/`updated_template`/`deleted_template` para plantillas.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7305,19 +7393,21 @@ Integración
 
 Integrar con
 
-- Usuarios
-- Proyectos
-- Tareas
-- Hitos
-- Dashboard
-- Reportes
-- Notificaciones
-- PWA
-- Auditoría
+- [x] Usuarios
+- [x] Proyectos
+- [x] Tareas
+- [x] Hitos
+- [x] Dashboard
+- [x] Reportes
+- [x] Notificaciones
+- [x] PWA
+- [x] Auditoría
+
+Implementación: los catálogos configurados se aplican a los flujos reales. `default_page` redirige tras login (`actions/auth.ts`), `primary_color` como variable CSS (`globals.css` → `var(--primary, ...)`) y `system_message` como banner en el layout del dashboard. Helper `features/settings/catalog.ts` (`getCatalogOptions`/`getCatalogValues`/`isValidCatalogValue`) alimenta los filtros y formularios de Proyectos, Tareas y Hitos (listas y detalle) con estados/prioridades configurados, con fallback a las constantes; las acciones `createProject/updateProject/createTask/updateTask/createSubtask/bulkUpdateTaskStatus/updateMilestone` validan en runtime contra los catálogos configurados. Reportes consume los datos de proyectos/tareas (que ya reflejan los estados configurados).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 

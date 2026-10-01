@@ -1,4 +1,8 @@
-export { DashboardService } from "./dashboard.service";
+export {
+  DashboardService,
+  assessAtRiskProject,
+  getCommentContextHref,
+} from "./dashboard.service";
 export type {
   AdminOverview,
   AdminUserStats,
@@ -7,6 +11,13 @@ export type {
   DueSoonProject,
   IntermediaryPanelData,
   IntermediaryPanelStats,
-  PanelComment,
   PendingTaskSummary,
+  CommentContextType,
+  RecentCommentItem,
+  RecentFileItem,
+  ProjectStatusCount,
+  DashboardAtRiskProject,
+  DeveloperDashboardData,
+  ClientDashboardProject,
+  ClientDashboardData,
 } from "./dashboard.service";

@@ -60,6 +60,7 @@ function parseActivityValue(raw: string | null): Record<string, unknown> | null 
 
 const DETAIL_VALUE_KEYS = [
   "name",
+  "title",
   "filename",
   "intermediary_name",
   "company_name",
