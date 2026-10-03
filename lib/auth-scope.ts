@@ -21,7 +21,30 @@ export function isAccessDeniedError(error: unknown): error is AccessDeniedError 
 
 const SCOPED_ENTITY_TYPES = new Set(["project", "task", "milestone", "client", "comment"]);
 
+// Épica 17 (17.1/17.2) — API-key requests carry no NextAuth session; the
+// public API wraps its handlers with the key owner's profile so every
+// data-layer scope resolves to the same visibility rules as the UI.
+// The AsyncLocalStorage instance lives in lib/api/actor-context.ts (server
+// only) and is injected through globalThis so this module — which is also
+// part of client bundles through shared services — never imports
+// node:async_hooks.
+const ACTOR_CONTEXT_KEY = "__admipyActorContext";
+
+interface ActorContext {
+  getStore(): SessionProfile | undefined;
+}
+
+function getActorContext(): ActorContext | null {
+  const candidate = (globalThis as Record<string, unknown>)[ACTOR_CONTEXT_KEY];
+  return candidate && typeof (candidate as ActorContext).getStore === "function"
+    ? (candidate as ActorContext)
+    : null;
+}
+
 async function requireUser(): Promise<SessionProfile> {
+  const override = getActorContext()?.getStore();
+  if (override) return override;
+
   const user = await getUser();
   if (!user) throw new Error("Unauthorized.");
   return user;

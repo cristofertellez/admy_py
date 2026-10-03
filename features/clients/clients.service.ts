@@ -118,6 +118,26 @@ export class ClientsService {
     return toBoolean(client);
   }
 
+  /**
+   * Épica 17 (17.10) — resolves a client for CSV imports by e-mail or
+   * company name (case-insensitive), respecting the caller's client scope.
+   */
+  static async findByEmailOrCompany(value: string) {
+    const scope = await clientScope("id");
+    const needle = value.trim().toLowerCase();
+
+    const client = await queryOne<Record<string, unknown>>(
+      `SELECT * FROM clients
+       WHERE deleted_at IS NULL
+         AND (LOWER(COALESCE(email, '')) = ? OR LOWER(company_name) = ?)
+         ${scope.sql ? `AND ${scope.sql}` : ""}
+       LIMIT 1`,
+      [needle, needle, ...scope.args],
+    );
+
+    return client ? toBoolean(client) : null;
+  }
+
   static async create(
     input: Omit<Client, "id" | "created_at" | "updated_at" | "is_active"> & { is_active?: boolean },
   ) {

@@ -1,6 +1,7 @@
 import { queryOne } from "@/lib/turso/client";
 import { NotificationsService } from "./notifications.service";
 import { EmailService } from "./email.service";
+import { publish } from "@/lib/events/bus";
 
 /**
  * Notification triggers (Historias 5.11 / 13.2 / 7.20).
@@ -8,7 +9,18 @@ import { EmailService } from "./email.service";
  * These helpers are invoked from server actions after a successful
  * mutation. They never throw: notification failures must not block
  * the main operation (same contract as ActivityService audit logs).
+ *
+ * Épica 17 (17.7): every trigger also publishes the equivalent internal
+ * event, which fans out to webhooks (17.3) and automation rules (17.6).
  */
+
+async function publishEvent(type: string, payload: Record<string, unknown>): Promise<void> {
+  try {
+    await publish({ type, payload });
+  } catch (err) {
+    console.error("[events] publish failed:", err instanceof Error ? err.message : err);
+  }
+}
 
 interface ProjectContext {
   id: string;
@@ -56,6 +68,7 @@ export async function notifyProjectUpdated(input: {
   projectId: string;
   actorId: string;
 }): Promise<void> {
+  await publishEvent("project.updated", { projectId: input.projectId, actorId: input.actorId });
   await safeExecute(() =>
     notifyProjectRecipients(input.projectId, input.actorId, (projectName) => ({
       title: "Project updated",
@@ -72,6 +85,7 @@ export async function notifyProjectCreated(input: {
   projectId: string;
   actorId: string;
 }): Promise<void> {
+  await publishEvent("project.created", { projectId: input.projectId, actorId: input.actorId });
   await safeExecute(() =>
     notifyProjectRecipients(input.projectId, input.actorId, (projectName) => ({
       title: "New project",
@@ -91,6 +105,12 @@ export async function notifyProjectStatusChanged(input: {
   from: string;
   to: string;
 }): Promise<void> {
+  await publishEvent("project.status_changed", {
+    projectId: input.projectId,
+    actorId: input.actorId,
+    from: input.from,
+    to: input.to,
+  });
   await safeExecute(() =>
     notifyProjectRecipients(input.projectId, input.actorId, (projectName) => ({
       title: "Project status changed",
@@ -107,6 +127,7 @@ export async function notifyProjectCompleted(input: {
   projectId: string;
   actorId: string;
 }): Promise<void> {
+  await publishEvent("project.completed", { projectId: input.projectId, actorId: input.actorId });
   await safeExecute(async () => {
     const project = await getProjectContext(input.projectId);
     if (!project) return;
@@ -138,6 +159,12 @@ export async function notifyCommentCreated(input: {
   commentPreview: string;
   authorId: string;
 }): Promise<void> {
+  await publishEvent("comment.created", {
+    entityId: input.entityId,
+    entityType: input.entityType,
+    actorId: input.authorId,
+    dedupeKey: input.commentId,
+  });
   await safeExecute(async () => {
     const projectId =
       input.entityType === "project"
@@ -190,6 +217,7 @@ export async function notifyMentioned(input: {
 }
 
 export async function notifyTaskCreated(taskId: string, actorId: string): Promise<void> {
+  await publishEvent("task.created", { taskId, actorId, dedupeKey: taskId });
   await safeExecute(async () => {
     const task = await queryOne<{ title: string; project_id: string }>(
       `SELECT title, project_id FROM tasks WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
@@ -241,6 +269,7 @@ export async function notifySubtaskCreated(parentTaskId: string, subtaskTitle: s
 
 /** Historia 7.10 — the assignee is notified on assignment/reassignment. */
 export async function notifyTaskAssigned(taskId: string, actorId: string): Promise<void> {
+  await publishEvent("task.assigned", { taskId, actorId, dedupeKey: taskId });
   await safeExecute(async () => {
     const task = await queryOne<{ title: string; assigned_to: string | null }>(
       `SELECT title, assigned_to FROM tasks WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
@@ -268,6 +297,13 @@ export async function notifyTaskStatusChanged(input: {
   from: string;
   to: string;
 }): Promise<void> {
+  await publishEvent("task.status_changed", {
+    taskId: input.taskId,
+    actorId: input.actorId,
+    from: input.from,
+    to: input.to,
+    dedupeKey: `${input.taskId}:${input.to}`,
+  });
   await safeExecute(async () => {
     const task = await queryOne<{ title: string; assigned_to: string | null; project_id: string }>(
       `SELECT title, assigned_to, project_id FROM tasks WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
@@ -311,6 +347,7 @@ export async function notifyTaskStatusChanged(input: {
 }
 
 export async function notifyMilestoneCompleted(milestoneId: string, actorId: string): Promise<void> {
+  await publishEvent("milestone.completed", { milestoneId, actorId, dedupeKey: milestoneId });
   await safeExecute(async () => {
     const milestone = await queryOne<{ title: string; project_id: string }>(
       `SELECT title, project_id FROM milestones WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
@@ -335,6 +372,11 @@ export async function notifyFileUploaded(input: {
   actorId: string;
   filename: string;
 }): Promise<void> {
+  await publishEvent("file.uploaded", {
+    projectId: input.projectId,
+    filename: input.filename,
+    actorId: input.actorId,
+  });
   await safeExecute(() =>
     notifyProjectRecipients(input.projectId, input.actorId, (projectName) => ({
       title: "File uploaded",

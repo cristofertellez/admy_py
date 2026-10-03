@@ -3,6 +3,7 @@
 import { ClientsService } from "@/features/clients";
 import { requirePermission } from "@/lib/auth";
 import { ActivityService } from "@/services/activity.service";
+import { publish } from "@/lib/events/bus";
 import { clientSchema, type ClientInput } from "@/schemas";
 import { revalidatePath } from "next/cache";
 import type { z } from "zod";
@@ -73,6 +74,12 @@ export async function createClient(_prevState: unknown, formData: FormData) {
           phone: created.phone,
           status: created.status,
         },
+      });
+
+      // Épica 17 — the internal event feeds webhooks and automations.
+      await publish({
+        type: "client.created",
+        payload: { clientId: created.id, companyName: created.company_name, actorId: actor.id },
       });
     }
 

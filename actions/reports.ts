@@ -17,8 +17,8 @@ export async function getProjectReport(projectId: string) {
   }
 }
 
-// Historia 6.19 â€” datos del proyecto para generar el PDF de exportaciÃ³n en el
-// cliente. Requiere permiso de exportaciÃ³n ademÃ¡s del acceso al proyecto.
+// Historia 6.19 â€” datos del proyecto para generar el PDF de exportación en el
+// cliente. Requiere permiso de exportación además del acceso al proyecto.
 export async function getProjectExportData(projectId: string) {
   const user = await requirePermission("reports.export");
 

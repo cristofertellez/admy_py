@@ -123,6 +123,16 @@ export function DashboardSidebar({ role, userId }: DashboardSidebarProps) {
                 Templates
               </NavItem>
             )}
+            {canAccessRoute("/dashboard/integrations", role) && (
+              <NavItem href="/dashboard/integrations" pathname={pathname}>
+                Integrations
+              </NavItem>
+            )}
+            {canAccessRoute("/dashboard/import", role) && (
+              <NavItem href="/dashboard/import" pathname={pathname}>
+                Data Import
+              </NavItem>
+            )}
             <div className="my-2 border-t border-hairline" />
             <NavItem href="/dashboard/profile" pathname={pathname}>
               Profile
