@@ -1,6 +1,7 @@
 export * from "./auth";
 export * from "./client";
 export * from "./milestone";
+export * from "./notifications";
 export * from "./preferences";
 export * from "./project";
 export * from "./settings";

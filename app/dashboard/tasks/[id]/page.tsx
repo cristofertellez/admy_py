@@ -72,6 +72,41 @@ export default async function TaskDetailPage({ params }: Props) {
     users: (entry.users as { first_name: string; last_name: string } | null) ?? null,
   }));
 
+  // Historia 7.18 — pure indicator computation (delay, productivity, health).
+  const estimatedHours = Number(task.estimated_hours ?? 0);
+  const workedHours = Number(task.worked_hours ?? 0);
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const estimatedEnd = (task.estimated_end as string | null) ?? null;
+  const isOverdue =
+    estimatedEnd !== null && estimatedEnd < todayKey && task.status !== "Completed" && task.status !== "Cancelled";
+  const delayDays = isOverdue && estimatedEnd
+    ? Math.max(1, Math.round((Date.parse(`${todayKey}T00:00:00Z`) - Date.parse(`${estimatedEnd}T00:00:00Z`)) / 86400000))
+    : 0;
+  const hoursRatio = estimatedHours > 0 ? workedHours / estimatedHours : 0;
+  const taskIndicators = {
+    isOverdue,
+    delayLabel: isOverdue ? `+${delayDays}d` : "On time",
+    productivityLabel: estimatedHours > 0 ? `${Math.round(hoursRatio * 100)}%` : "—",
+    healthVariant:
+      task.status === "Completed"
+        ? ("success" as const)
+        : task.status === "Blocked" || isOverdue
+          ? ("error" as const)
+          : hoursRatio > 1
+            ? ("warning" as const)
+            : ("default" as const),
+    healthLabel:
+      task.status === "Completed"
+        ? "Completed"
+        : task.status === "Blocked"
+          ? "Blocked"
+          : isOverdue
+            ? "At risk"
+            : hoursRatio > 1
+              ? "Hours overrun"
+              : "Healthy",
+  };
+
   const [statusOptions, priorityOptions] = await Promise.all([
     getCatalogOptions("task_statuses", TASK_STATUS_OPTIONS),
     getCatalogOptions("task_priorities", TASK_PRIORITY_OPTIONS),
@@ -103,6 +138,20 @@ export default async function TaskDetailPage({ params }: Props) {
         <Card><CardContent className="pt-6 text-center"><p className="text-display-md text-ink">{task.estimated_hours as number}h</p><p className="text-caption text-muted">Estimated</p></CardContent></Card>
         <Card><CardContent className="pt-6 text-center"><p className="text-display-md text-ink">{task.worked_hours as number}h</p><p className="text-caption text-muted">Worked</p></CardContent></Card>
         <Card><CardContent className="pt-6 text-center"><p className="text-display-md text-ink">{subtasks.length}</p><p className="text-caption text-muted">Subtasks</p></CardContent></Card>
+      </div>
+
+      {/* Historia 7.18 — automatic indicators: remaining hours, delay,
+          productivity and general health derived from the task data. */}
+      <div className="grid gap-6 md:grid-cols-4">
+        <Card><CardContent className="pt-6 text-center"><p className="text-display-md text-ink">{Math.max(0, Number(task.estimated_hours ?? 0) - Number(task.worked_hours ?? 0))}h</p><p className="text-caption text-muted">Remaining</p></CardContent></Card>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <p className={`text-display-md ${taskIndicators.isOverdue ? "text-error" : "text-ink"}`}>{taskIndicators.delayLabel}</p>
+            <p className="text-caption text-muted">Delay</p>
+          </CardContent>
+        </Card>
+        <Card><CardContent className="pt-6 text-center"><p className="text-display-md text-ink">{taskIndicators.productivityLabel}</p><p className="text-caption text-muted">Productivity</p></CardContent></Card>
+        <Card><CardContent className="pt-6 text-center"><Badge variant={taskIndicators.healthVariant}>{taskIndicators.healthLabel}</Badge><p className="mt-1 text-caption text-muted">General status</p></CardContent></Card>
       </div>
 
       {task.description ? (

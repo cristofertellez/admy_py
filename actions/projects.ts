@@ -5,7 +5,7 @@ import { assertProjectStatusTransition } from "@/features/projects/project-statu
 import { TagsService } from "@/features/tags";
 import { isValidCatalogValue } from "@/features/settings";
 import { PROJECT_STATUSES, PRIORITIES } from "@/constants";
-import { notifyProjectCompleted, notifyProjectUpdated } from "@/features/notifications";
+import { notifyProjectCompleted, notifyProjectCreated, notifyProjectStatusChanged, notifyProjectUpdated } from "@/features/notifications";
 import { requirePermission } from "@/lib/auth";
 import { ActivityService } from "@/services/activity.service";
 import {
@@ -75,6 +75,9 @@ const parsed = parseProjectForm(projectSchema, formData);
     if (parsed.data.tags.length > 0) {
       await TagsService.setProjectTags(created.id, parsed.data.tags);
     }
+
+    // Historia 13.2 — project creation reaches the project audience.
+    await notifyProjectCreated({ projectId: created.id, actorId: actor.id });
 
     await ActivityService.log({
       user_id: actor.id,
@@ -188,6 +191,13 @@ const parsed = parseProjectForm(projectUpdateSchema, formData);
 
     if (previous.status !== "Completed" && next.status === "Completed") {
       await notifyProjectCompleted({ projectId: id, actorId: actor.id });
+    } else if (statusChanged) {
+      await notifyProjectStatusChanged({
+        projectId: id,
+        actorId: actor.id,
+        from: previous.status,
+        to: next.status,
+      });
     } else {
       await notifyProjectUpdated({ projectId: id, actorId: actor.id });
     }

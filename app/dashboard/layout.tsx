@@ -1,6 +1,8 @@
 import { requireAuth } from "@/lib/auth";
 import { SettingsService } from "@/features/settings";
+import { NotificationsService } from "@/features/notifications";
 import { Header } from "@/components/layout/header";
+import { NotificationsBell } from "@/components/layout/notifications-bell";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ConnectivityIndicator } from "@/components/pwa/connectivity-indicator";
 import { OfflineSyncManager } from "@/components/pwa/offline-sync-manager";
@@ -18,9 +20,10 @@ const DEFAULT_PRIMARY = "#6D28D9";
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth();
 
-  const [primaryRaw, systemMessage] = await Promise.all([
+  const [primaryRaw, systemMessage, unreadCount] = await Promise.all([
     SettingsService.getValue("primary_color"),
     SettingsService.getValue("system_message"),
+    NotificationsService.getUnreadCount(user.id).catch(() => 0),
   ]);
   const primary =
     typeof primaryRaw === "string" && /^#[0-9A-Fa-f]{6}$/.test(primaryRaw) ? primaryRaw : DEFAULT_PRIMARY;
@@ -32,6 +35,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Header>
         <DashboardSidebar role={user.role} userId={user.id} />
         <ConnectivityIndicator />
+        <NotificationsBell unreadCount={unreadCount} />
         <DashboardHeaderActions />
       </Header>
       <main className="pt-16 lg:pl-64">

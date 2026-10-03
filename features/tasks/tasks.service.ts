@@ -72,8 +72,23 @@ export class TasksService {
     const args: InValue[] = [...(scope.sql ? scope.args : [])];
 
     if (search) {
-      conditions.push("(LOWER(t.title) LIKE LOWER(?) OR LOWER(COALESCE(t.description, '')) LIKE LOWER(?))");
-      args.push(`%${search}%`, `%${search}%`);
+      // Historia 7.21 — global search matches title, description, assignee,
+      // project, status, priority and tags in a single predicate.
+      const pattern = `%${search.toLowerCase()}%`;
+      conditions.push(
+        `(LOWER(t.title) LIKE ?
+          OR LOWER(COALESCE(t.description, '')) LIKE ?
+          OR LOWER(t.status) LIKE ?
+          OR LOWER(t.priority) LIKE ?
+          OR LOWER(COALESCE(p.name, '')) LIKE ?
+          OR LOWER(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) LIKE ?
+          OR EXISTS (
+            SELECT 1 FROM task_tags tt
+            JOIN tags tg ON tg.id = tt.tag_id
+            WHERE tt.task_id = t.id AND LOWER(tg.name) LIKE ?
+          ))`,
+      );
+      args.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern);
     }
     if (projectId) {
       conditions.push("t.project_id = ?");
@@ -97,7 +112,13 @@ export class TasksService {
     const direction = sortOrder === "desc" ? "DESC" : "ASC";
     const offset = (page - 1) * pageSize;
 
-    const total = await countRows(`SELECT COUNT(*) AS total FROM tasks t ${where}`, args);
+    const total = await countRows(
+      `SELECT COUNT(*) AS total FROM tasks t
+       LEFT JOIN projects p ON p.id = t.project_id
+       LEFT JOIN users u ON u.id = t.assigned_to
+       ${where}`,
+      args,
+    );
 
     const rows = await query<TaskListRow>(
       `SELECT t.*, p.name AS project_name,
@@ -332,9 +353,42 @@ export class TasksService {
     }));
   }
 
+  /**
+   * Historia 7.9 — validates that adding `dependsOnTaskId` does not create
+   * a dependency cycle. Walks the graph starting from the proposed
+   * predecessor; if the target task is reachable, the link is circular.
+   */
+  private static async assertNoDependencyCycle(taskId: string, dependsOnTaskId: string): Promise<void> {
+    const visited = new Set<string>();
+    const queue = [dependsOnTaskId];
+
+    while (queue.length > 0) {
+      const current = queue.pop() as string;
+      if (current === taskId) {
+        throw new Error("This dependency would create a circular chain.");
+      }
+      if (visited.has(current)) continue;
+      visited.add(current);
+
+      const next = await query<{ depends_on_task_id: string }>(
+        "SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?",
+        [current],
+      );
+      queue.push(...next.map((row) => row.depends_on_task_id));
+    }
+  }
+
   static async addDependency(taskId: string, dependsOnTaskId: string, dependencyType = "Finish to Start") {
     await assertTaskVisible(taskId);
     await assertTaskVisible(dependsOnTaskId);
+
+    const duplicate = await queryOne<{ id: string }>(
+      "SELECT id FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ? LIMIT 1",
+      [taskId, dependsOnTaskId],
+    );
+    if (duplicate) throw new Error("This dependency already exists.");
+
+    await TasksService.assertNoDependencyCycle(taskId, dependsOnTaskId);
 
     const id = newId();
     await query(
@@ -343,6 +397,20 @@ export class TasksService {
     );
 
     return queryOne("SELECT * FROM task_dependencies WHERE id = ?", [id]);
+  }
+
+  /**
+   * Historia 7.9 — open dependencies that still block a task from being
+   * completed. Only unfinished predecessors are returned.
+   */
+  static async getUnfinishedDependencies(taskId: string) {
+    return query<{ id: string; title: string; status: string }>(
+      `SELECT dt.id, dt.title, dt.status
+       FROM task_dependencies d
+       JOIN tasks dt ON dt.id = d.depends_on_task_id
+       WHERE d.task_id = ? AND dt.status NOT IN ('Completed', 'Cancelled')`,
+      [taskId],
+    );
   }
 
   static async removeDependency(id: string): Promise<string | null> {

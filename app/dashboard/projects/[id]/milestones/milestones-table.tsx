@@ -15,6 +15,10 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { MilestoneComments, type MilestoneCommentRow } from "./milestone-comments";
 import { MilestoneFormModal } from "./milestone-form-modal";
 import { MilestoneTasksModal } from "./milestone-tasks-modal";
+import {
+  MilestoneDependencies,
+  type MilestoneDependencyRow,
+} from "./milestone-dependencies";
 
 // Row enriched server-side: aggregates + indicators come precomputed so the
 // table never re-runs business rules on the client (Historias 8.6/8.9).
@@ -46,6 +50,8 @@ interface Props {
   canManage: boolean;
   canManageTasks: boolean;
   commentsByMilestone: Map<string, MilestoneCommentRow[]>;
+  dependenciesByMilestone: Map<string, { predecessors: MilestoneDependencyRow[]; successors: MilestoneDependencyRow[] }>;
+  milestoneOptions: { id: string; title: string; status: string; estimated_date: string | null }[];
   currentUserId: string | null;
   canComment: boolean;
   canModerate: boolean;
@@ -83,6 +89,8 @@ export function MilestonesTable({
   canManage,
   canManageTasks,
   commentsByMilestone,
+  dependenciesByMilestone,
+  milestoneOptions,
   currentUserId,
   canComment,
   canModerate,
@@ -99,6 +107,7 @@ export function MilestonesTable({
   const [editing, setEditing] = useState<MilestoneViewRow | null>(null);
   const [openMilestone, setOpenMilestone] = useState<string | null>(null);
   const [tasksMilestone, setTasksMilestone] = useState<MilestoneViewRow | null>(null);
+  const [depsMilestone, setDepsMilestone] = useState<MilestoneViewRow | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [, startTransition] = useTransition();
@@ -230,6 +239,12 @@ export function MilestonesTable({
             className="text-body-sm text-primary hover:underline"
           >
             {openMilestone === row.original.id ? "Hide Comments" : "Comments"}
+          </button>
+          <button
+            onClick={() => setDepsMilestone((cur) => (cur?.id === row.original.id ? null : row.original))}
+            className="text-body-sm text-primary hover:underline"
+          >
+            {depsMilestone?.id === row.original.id ? "Hide Dependencies" : "Dependencies"}
           </button>
           {canManageTasks && (
             <button onClick={() => setTasksMilestone(row.original)} className="text-body-sm text-primary hover:underline">
@@ -379,6 +394,28 @@ export function MilestonesTable({
             canUploadFiles={canUploadFiles}
             canDeleteFiles={canDeleteFiles}
             canDownloadFiles={canDownloadFiles}
+          />
+        </div>
+      )}
+
+      {depsMilestone && (
+        <div className="rounded-xl border border-hairline bg-surface-card p-4">
+          <h2 className="mb-1 text-body-strong">Dependencies — {depsMilestone.title}</h2>
+          <p className="mb-4 text-caption text-muted">
+            Historia 8.8: link predecessors and related milestones. Circular chains are rejected.
+          </p>
+          <MilestoneDependencies
+            milestone={{ id: depsMilestone.id, title: depsMilestone.title }}
+            predecessors={dependenciesByMilestone.get(depsMilestone.id)?.predecessors ?? []}
+            successors={dependenciesByMilestone.get(depsMilestone.id)?.successors ?? []}
+            availableMilestones={milestoneOptions.filter(
+              (option) =>
+                option.id !== depsMilestone.id &&
+                !(dependenciesByMilestone.get(depsMilestone.id)?.predecessors ?? []).some(
+                  (dep) => dep.milestone.id === option.id,
+                ),
+            )}
+            canManage={canManage}
           />
         </div>
       )}

@@ -4,7 +4,7 @@ import { TasksService } from "@/features/tasks";
 import { assertTaskStatusTransition } from "@/features/tasks/task-status";
 import { isValidCatalogValue } from "@/features/settings";
 import { TASK_STATUSES, PRIORITIES } from "@/constants";
-import { notifyTaskCreated } from "@/features/notifications";
+import { notifyTaskAssigned, notifyTaskCreated, notifyTaskStatusChanged, notifySubtaskCreated } from "@/features/notifications";
 import { requirePermission } from "@/lib/auth";
 import { ActivityService } from "@/services/activity.service";
 import { taskSchema, taskUpdateSchema, bulkUpdateTaskStatusSchema, TASK_AUDIT_FIELDS } from "@/schemas";
@@ -124,6 +124,17 @@ export async function updateTask(_prevState: unknown, formData: FormData): Promi
     const statusChanged = previous.status !== next.status;
     if (statusChanged) {
       assertTaskStatusTransition(previous.status, next.status);
+      // Historia 7.9 — a task with unfinished dependencies cannot complete.
+      if (next.status === "Completed") {
+        const blockers = await TasksService.getUnfinishedDependencies(id);
+        if (blockers.length > 0) {
+          return {
+            error: `This task is blocked by ${blockers.length} unfinished dependenc${blockers.length === 1 ? "y" : "ies"}: ${blockers
+              .map((task) => `"${task.title}" (${task.status})`)
+              .join(", ")}.`,
+          };
+        }
+      }
     }
 
     // Edits are audited field by field; the status change gets its own
@@ -152,6 +163,40 @@ export async function updateTask(_prevState: unknown, formData: FormData): Promi
         entity_id: id,
         old_value: { status: previous.status },
         new_value: { status: next.status },
+      });
+      // Historia 7.20 — status changes notify assignee and project audience.
+      await notifyTaskStatusChanged({
+        taskId: id,
+        actorId: actor.id,
+        from: previous.status,
+        to: next.status,
+      });
+    }
+
+    // Historia 16.4 — assignee and priority changes get dedicated audit
+    // events in addition to the generic field diff.
+    const assigneeChanged = previous.assigned_to !== next.assigned_to;
+    if (assigneeChanged) {
+      await ActivityService.log({
+        user_id: actor.id,
+        action: "assigned_task",
+        entity: "Task",
+        entity_id: id,
+        old_value: { assigned_to: previous.assigned_to },
+        new_value: { assigned_to: next.assigned_to },
+      });
+      await notifyTaskAssigned(id, actor.id);
+    }
+
+    const priorityChanged = previous.priority !== next.priority;
+    if (priorityChanged) {
+      await ActivityService.log({
+        user_id: actor.id,
+        action: "changed_task_priority",
+        entity: "Task",
+        entity_id: id,
+        old_value: { priority: previous.priority },
+        new_value: { priority: next.priority },
       });
     }
 
@@ -219,7 +264,7 @@ export async function createSubtask(_prevState: unknown, formData: FormData): Pr
       updated_by: actor.id,
     });
 
-    await notifyTaskCreated(created.id, actor.id);
+    await notifySubtaskCreated(parentTaskId, created.title, actor.id);
 
     // Recorded on the parent so its change history includes subtask activity.
     await ActivityService.log({
@@ -252,6 +297,15 @@ export async function toggleTaskCompletion(_prevState: unknown, formData: FormDa
     const nextStatus = completed ? "Completed" : "In Progress";
     if (previous.status !== nextStatus) {
       assertTaskStatusTransition(previous.status, nextStatus);
+      // Historia 7.9 — a task with unfinished dependencies cannot complete.
+      if (nextStatus === "Completed") {
+        const blockers = await TasksService.getUnfinishedDependencies(id);
+        if (blockers.length > 0) {
+          return {
+            error: `This task is blocked by ${blockers.length} unfinished dependenc${blockers.length === 1 ? "y" : "ies"}.`,
+          };
+        }
+      }
     }
 
     await TasksService.update(id, {
@@ -268,6 +322,12 @@ export async function toggleTaskCompletion(_prevState: unknown, formData: FormDa
         entity_id: id,
         old_value: { status: previous.status },
         new_value: { status: nextStatus },
+      });
+      await notifyTaskStatusChanged({
+        taskId: id,
+        actorId: actor.id,
+        from: previous.status,
+        to: nextStatus,
       });
     }
 
@@ -373,6 +433,15 @@ export async function bulkUpdateTaskStatus(ids: string[], status: string): Promi
       previousStatus = previous.status;
       if (previousStatus !== status) {
         assertTaskStatusTransition(previousStatus, status);
+        // Historia 7.9 — a task with unfinished dependencies cannot complete.
+        if (status === "Completed") {
+          const blockers = await TasksService.getUnfinishedDependencies(id);
+          if (blockers.length > 0) {
+            throw new Error(
+              `"${previous.title}" is blocked by ${blockers.length} unfinished dependenc${blockers.length === 1 ? "y" : "ies"}.`,
+            );
+          }
+        }
         await TasksService.update(id, { status, updated_by: actor.id });
       }
     } catch (err) {
@@ -392,6 +461,7 @@ export async function bulkUpdateTaskStatus(ids: string[], status: string): Promi
         old_value: { status: previousStatus },
         new_value: { status },
       });
+      await notifyTaskStatusChanged({ taskId: id, actorId: actor.id, from: previousStatus, to: status });
     }
     succeeded += 1;
   }
@@ -405,7 +475,7 @@ export async function bulkUpdateTaskStatus(ids: string[], status: string): Promi
 }
 
 export async function addTaskDependency(_prevState: unknown, formData: FormData): Promise<ActionState> {
-  await requirePermission("tasks.update");
+  const actor = await requirePermission("tasks.update");
 
   try {
     const taskId = formData.get("task_id");
@@ -417,6 +487,16 @@ export async function addTaskDependency(_prevState: unknown, formData: FormData)
     }
 
     await TasksService.addDependency(taskId, dependsOnTaskId, dependencyType);
+
+    // Historia 7.23 — dependency changes are audited on the task.
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "added_task_dependency",
+      entity: "Task",
+      entity_id: taskId,
+      new_value: { depends_on_task_id: dependsOnTaskId, dependency_type: dependencyType },
+    });
+
     revalidatePath(`/dashboard/tasks/${taskId}`);
     return { success: "Dependency added." };
   } catch (err) {
@@ -425,14 +505,23 @@ export async function addTaskDependency(_prevState: unknown, formData: FormData)
 }
 
 export async function removeTaskDependency(_prevState: unknown, formData: FormData): Promise<ActionState> {
-  await requirePermission("tasks.update");
+  const actor = await requirePermission("tasks.update");
 
   try {
     const dependencyId = formData.get("dependency_id");
     if (typeof dependencyId !== "string" || !dependencyId) return { error: "Dependency ID is required." };
 
     const taskId = await TasksService.removeDependency(dependencyId);
-    if (taskId) revalidatePath(`/dashboard/tasks/${taskId}`);
+    if (taskId) {
+      await ActivityService.log({
+        user_id: actor.id,
+        action: "removed_task_dependency",
+        entity: "Task",
+        entity_id: taskId,
+        new_value: { dependency_id: dependencyId },
+      });
+      revalidatePath(`/dashboard/tasks/${taskId}`);
+    }
     return { success: "Dependency removed." };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to remove dependency." };

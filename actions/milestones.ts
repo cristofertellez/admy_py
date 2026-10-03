@@ -4,6 +4,7 @@ import { MilestonesService } from "@/features/milestones";
 import { assertMilestoneStatusTransition } from "@/features/milestones/milestone-status";
 import { isValidCatalogValue } from "@/features/settings";
 import { MILESTONE_STATUSES } from "@/constants";
+import { notifyMilestoneCompleted } from "@/features/notifications";
 import { requirePermission } from "@/lib/auth";
 import { ActivityService } from "@/services/activity.service";
 import {
@@ -154,6 +155,10 @@ export async function updateMilestone(_prevState: unknown, formData: FormData): 
         old_value: { status: previous.status },
         new_value: { status: next.status },
       });
+      // Historia 13.2 — milestone completion reaches the project audience.
+      if (previous.status !== "Completed" && next.status === "Completed") {
+        await notifyMilestoneCompleted(id, actor.id);
+      }
     }
 
     if (changedFields.length > 0) {
@@ -320,5 +325,60 @@ export async function removeTaskFromMilestone(_prevState: unknown, formData: For
     return { success: "Task removed from milestone." };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to remove task." };
+  }
+}
+
+// Historia 8.8 — Dependencias entre hitos (predecesor / relacionado), con
+// validación de ciclos en la capa de servicio y auditoría por hito.
+export async function addMilestoneDependency(_prevState: unknown, formData: FormData): Promise<ActionState> {
+  const actor = await requirePermission("projects.update");
+
+  try {
+    const milestoneId = formData.get("milestone_id");
+    const dependsOnMilestoneId = formData.get("depends_on_milestone_id");
+    const dependencyType = (formData.get("dependency_type") as string) || "Finish to Start";
+
+    if (typeof milestoneId !== "string" || !milestoneId || typeof dependsOnMilestoneId !== "string" || !dependsOnMilestoneId) {
+      return { error: "Both milestones are required." };
+    }
+
+    await MilestonesService.addMilestoneDependency(milestoneId, dependsOnMilestoneId, dependencyType);
+
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "added_milestone_dependency",
+      entity: "Milestone",
+      entity_id: milestoneId,
+      new_value: { depends_on_milestone_id: dependsOnMilestoneId, dependency_type: dependencyType },
+    });
+
+    revalidatePath(`/dashboard/projects/[id]/milestones`, "layout");
+    return { success: "Milestone dependency added." };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to add milestone dependency." };
+  }
+}
+
+export async function removeMilestoneDependency(_prevState: unknown, formData: FormData): Promise<ActionState> {
+  const actor = await requirePermission("projects.update");
+
+  try {
+    const dependencyId = formData.get("dependency_id");
+    if (typeof dependencyId !== "string" || !dependencyId) return { error: "Dependency ID is required." };
+
+    const milestoneId = await MilestonesService.removeMilestoneDependency(dependencyId);
+    if (milestoneId) {
+      await ActivityService.log({
+        user_id: actor.id,
+        action: "removed_milestone_dependency",
+        entity: "Milestone",
+        entity_id: milestoneId,
+        new_value: { dependency_id: dependencyId },
+      });
+      revalidatePath(`/dashboard/projects/[id]/milestones`, "layout");
+    }
+    return { success: "Milestone dependency removed." };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to remove milestone dependency." };
   }
 }

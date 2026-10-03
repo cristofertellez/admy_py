@@ -319,4 +319,196 @@ export class MilestonesService {
       [...scope.args, limit],
     );
   }
+
+  /**
+   * Historia 8.8 — dependency CRUD between milestones with cycle
+   * validation, mirroring the task dependency flow.
+   */
+  static async getDependencies(milestoneId: string) {
+    const predecessors = await query<{
+      id: string;
+      dependency_type: string;
+      created_at: string;
+      dep_id: string;
+      dep_title: string;
+      dep_status: string;
+      dep_estimated_date: string | null;
+    }>(
+      `SELECT d.id, d.dependency_type, d.created_at,
+              m.id AS dep_id, m.title AS dep_title, m.status AS dep_status,
+              m.estimated_date AS dep_estimated_date
+       FROM milestone_dependencies d
+       JOIN milestones m ON m.id = d.depends_on_milestone_id
+       WHERE d.milestone_id = ?
+       ORDER BY d.created_at ASC`,
+      [milestoneId],
+    );
+
+    const successors = await query<{
+      id: string;
+      dependency_type: string;
+      created_at: string;
+      dep_id: string;
+      dep_title: string;
+      dep_status: string;
+      dep_estimated_date: string | null;
+    }>(
+      `SELECT d.id, d.dependency_type, d.created_at,
+              m.id AS dep_id, m.title AS dep_title, m.status AS dep_status,
+              m.estimated_date AS dep_estimated_date
+       FROM milestone_dependencies d
+       JOIN milestones m ON m.id = d.milestone_id
+       WHERE d.depends_on_milestone_id = ?
+       ORDER BY d.created_at ASC`,
+      [milestoneId],
+    );
+
+    const mapRow = (row: (typeof predecessors)[number]) => ({
+      id: row.id,
+      dependency_type: row.dependency_type,
+      created_at: row.created_at,
+      milestone: {
+        id: row.dep_id,
+        title: row.dep_title,
+        status: row.dep_status,
+        estimated_date: row.dep_estimated_date,
+      },
+    });
+
+    return {
+      predecessors: predecessors.map(mapRow),
+      successors: successors.map(mapRow),
+    };
+  }
+
+  /** All dependencies of a project's milestones in one query (batch UI). */
+  static async getProjectDependencies(projectId: string) {
+    const rows = await query<{
+      id: string;
+      milestone_id: string;
+      depends_on_milestone_id: string;
+      dependency_type: string;
+      from_title: string;
+      to_title: string;
+    }>(
+      `SELECT d.id, d.milestone_id, d.depends_on_milestone_id, d.dependency_type,
+              m1.title AS from_title, m2.title AS to_title
+       FROM milestone_dependencies d
+       JOIN milestones m1 ON m1.id = d.milestone_id
+       JOIN milestones m2 ON m2.id = d.depends_on_milestone_id
+       WHERE m1.project_id = ? AND m2.project_id = ?
+       ORDER BY d.created_at ASC`,
+      [projectId, projectId],
+    );
+    return rows;
+  }
+
+  private static async assertNoDependencyCycle(
+    milestoneId: string,
+    dependsOnMilestoneId: string,
+  ): Promise<void> {
+    const visited = new Set<string>();
+    const queue = [dependsOnMilestoneId];
+
+    while (queue.length > 0) {
+      const current = queue.pop() as string;
+      if (current === milestoneId) {
+        throw new Error("This dependency would create a circular chain.");
+      }
+      if (visited.has(current)) continue;
+      visited.add(current);
+
+      const next = await query<{ depends_on_milestone_id: string }>(
+        "SELECT depends_on_milestone_id FROM milestone_dependencies WHERE milestone_id = ?",
+        [current],
+      );
+      queue.push(...next.map((row) => row.depends_on_milestone_id));
+    }
+  }
+
+  static async addMilestoneDependency(
+    milestoneId: string,
+    dependsOnMilestoneId: string,
+    dependencyType = "Finish to Start",
+  ) {
+    await assertMilestoneVisible(milestoneId);
+    await assertMilestoneVisible(dependsOnMilestoneId);
+
+    const duplicate = await queryOne<{ id: string }>(
+      `SELECT id FROM milestone_dependencies
+       WHERE milestone_id = ? AND depends_on_milestone_id = ? LIMIT 1`,
+      [milestoneId, dependsOnMilestoneId],
+    );
+    if (duplicate) throw new Error("This dependency already exists.");
+
+    await MilestonesService.assertNoDependencyCycle(milestoneId, dependsOnMilestoneId);
+
+    const id = newId();
+    await query(
+      `INSERT INTO milestone_dependencies (id, milestone_id, depends_on_milestone_id, dependency_type)
+       VALUES (?, ?, ?, ?)`,
+      [id, milestoneId, dependsOnMilestoneId, dependencyType],
+    );
+
+    return queryOne("SELECT * FROM milestone_dependencies WHERE id = ?", [id]);
+  }
+
+  static async removeMilestoneDependency(id: string): Promise<string | null> {
+    const dependency = await queryOne<{ milestone_id: string }>(
+      "SELECT milestone_id FROM milestone_dependencies WHERE id = ?",
+      [id],
+    );
+    if (!dependency) throw new Error("Dependency not found.");
+
+    await assertMilestoneVisible(dependency.milestone_id);
+    await query("DELETE FROM milestone_dependencies WHERE id = ?", [id]);
+
+    return dependency.milestone_id;
+  }
+
+  static async getAvailableMilestonesForDependency(milestoneId: string, projectId: string) {
+    const existing = await query<{ depends_on_milestone_id: string }>(
+      "SELECT depends_on_milestone_id FROM milestone_dependencies WHERE milestone_id = ?",
+      [milestoneId],
+    );
+    const excludeIds = [milestoneId, ...existing.map((d) => d.depends_on_milestone_id)];
+    const placeholders = excludeIds.map(() => "?").join(", ");
+
+    return query<{ id: string; title: string; status: string; estimated_date: string | null }>(
+      `SELECT id, title, status, estimated_date
+       FROM milestones
+       WHERE project_id = ? AND deleted_at IS NULL AND is_active = 1
+         AND id NOT IN (${placeholders})
+       ORDER BY sort_order ASC`,
+      [projectId, ...excludeIds],
+    );
+  }
+
+  /**
+   * Historia 7.15 — milestone deliveries inside a calendar month,
+   * respecting the caller's project visibility scope.
+   */
+  static async getCalendarMilestones(
+    year: number,
+    month: number,
+    projectId?: string,
+  ): Promise<UpcomingMilestone[]> {
+    const scope = await projectScope("p.id");
+    const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
+
+    return query<UpcomingMilestone>(
+      `SELECT m.id, m.title, m.status, m.estimated_date, m.completion_percentage,
+              p.id AS project_id, p.name AS project_name, c.company_name AS client_name
+       FROM milestones m
+       JOIN projects p ON p.id = m.project_id
+       JOIN clients c ON c.id = p.client_id
+       WHERE m.deleted_at IS NULL AND m.is_active = 1
+         AND p.deleted_at IS NULL AND c.deleted_at IS NULL AND c.is_active = 1
+         AND m.estimated_date LIKE ?${projectId ? " AND m.project_id = ?" : ""}${scope.sql ? ` AND ${scope.sql}` : ""}
+       ORDER BY m.estimated_date ASC`,
+      projectId
+        ? [`${monthPrefix}%`, projectId, ...scope.args]
+        : [`${monthPrefix}%`, ...scope.args],
+    );
+  }
 }

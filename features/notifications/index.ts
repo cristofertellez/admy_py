@@ -1,10 +1,22 @@
-export { NotificationsService } from "./notifications.service";
-export type { NotificationType } from "./notifications.service";
+export { NotificationsService, NOTIFICATION_TYPES } from "./notifications.service";
+export type {
+  NotificationType,
+  CreateNotificationInput,
+  NotificationListFilters,
+  NotificationPreferences,
+} from "./notifications.service";
+export { EmailService } from "./email.service";
 export {
   notifyProjectUpdated,
+  notifyProjectCreated,
+  notifyProjectStatusChanged,
   notifyProjectCompleted,
   notifyCommentCreated,
-  notifyTaskCreated,
   notifyMentioned,
+  notifyTaskCreated,
+  notifySubtaskCreated,
+  notifyTaskAssigned,
+  notifyTaskStatusChanged,
+  notifyMilestoneCompleted,
   notifyFileUploaded,
 } from "./notification-triggers";

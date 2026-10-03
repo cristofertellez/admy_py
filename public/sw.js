@@ -9,7 +9,7 @@
 // - Images/icons:                Stale While Revalidate in a bounded cache
 // - Manifest/config:             Stale While Revalidate
 
-const VERSION = "v2";
+const VERSION = "v3";
 
 const PRECACHE_CACHE = `admipy-precache-${VERSION}`;
 const STATIC_CACHE = `admipy-static-${VERSION}`;
@@ -225,4 +225,44 @@ self.addEventListener("fetch", (event) => {
   if (isImage && isSameOrigin) {
     event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE, MAX_RUNTIME_ENTRIES));
   }
+});
+
+// ============================================================
+// Web Push support (Historias 13.4 / 14.12 — prepared)
+// Delivery requires a push provider (VAPID keys + push service);
+// these handlers make the Service Worker ready for when it lands.
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  let payload = null;
+  try {
+    payload = event.data.json();
+  } catch (err) {
+    payload = { title: "AdmiPy", body: event.data.text() };
+  }
+  const title = payload.title || "AdmiPy";
+  const options = {
+    body: payload.body || payload.message || "",
+    tag: payload.tag || "admipy-notification",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    data: { url: payload.url || "/dashboard/notifications" },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/dashboard/notifications";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes("/dashboard") && "focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    }),
+  );
 });

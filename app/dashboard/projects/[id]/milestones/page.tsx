@@ -15,6 +15,12 @@ interface Props {
   searchParams: Promise<{ q?: string; status?: string; view?: string }>;
 }
 
+interface DependencyRow {
+  id: string;
+  dependency_type: string;
+  milestone: { id: string; title: string; status: string; estimated_date: string | null };
+}
+
 const MILESTONE_STATUS_FALLBACK = ["Pending", "In Progress", "In Review", "Completed", "Cancelled"] as const;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -46,7 +52,7 @@ export default async function ProjectMilestonesPage({ params, searchParams }: Pr
     throw err;
   }
 
-  const [milestones, summary, comments, projectTasks, statusOptions, historyLogs] = await Promise.all([
+  const [milestones, summary, comments, projectTasks, statusOptions, historyLogs, dependencyRows] = await Promise.all([
     MilestonesService.listByProject(id, { search, status }),
     MilestonesService.getProjectSummary(id),
     CommentsService.listByProjectMilestones(id),
@@ -56,6 +62,7 @@ export default async function ProjectMilestonesPage({ params, searchParams }: Pr
       MILESTONE_STATUS_FALLBACK.map((value) => ({ value, label: value })),
     ),
     MilestonesService.getProjectHistory(id, 10),
+    MilestonesService.getProjectDependencies(id).catch(() => []),
   ]);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -79,6 +86,45 @@ export default async function ProjectMilestonesPage({ params, searchParams }: Pr
     const list = commentsByMilestone.get(comment.milestone_id) ?? [];
     list.push(comment as unknown as MilestoneCommentRow);
     commentsByMilestone.set(comment.milestone_id, list);
+  }
+
+  // Historia 8.8 — dependency rows grouped per milestone (single query).
+  const dependenciesByMilestone = new Map<
+    string,
+    { predecessors: DependencyRow[]; successors: DependencyRow[] }
+  >();
+  const milestoneOptions = rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    estimated_date: row.estimated_date,
+  }));
+  for (const row of dependencyRows) {
+    const entry = dependenciesByMilestone.get(row.milestone_id) ?? { predecessors: [], successors: [] };
+    entry.predecessors.push({
+      id: row.id,
+      dependency_type: row.dependency_type,
+      milestone: {
+        id: row.depends_on_milestone_id,
+        title: row.to_title,
+        status: "",
+        estimated_date: null,
+      },
+    });
+    dependenciesByMilestone.set(row.milestone_id, entry);
+
+    const reverse = dependenciesByMilestone.get(row.depends_on_milestone_id) ?? { predecessors: [], successors: [] };
+    reverse.successors.push({
+      id: row.id,
+      dependency_type: row.dependency_type,
+      milestone: {
+        id: row.milestone_id,
+        title: row.from_title,
+        status: "",
+        estimated_date: null,
+      },
+    });
+    dependenciesByMilestone.set(row.depends_on_milestone_id, reverse);
   }
 
   return (
@@ -116,6 +162,8 @@ export default async function ProjectMilestonesPage({ params, searchParams }: Pr
         canUploadFiles={user ? hasPermission(user, "files.upload") : false}
         canDeleteFiles={user ? hasPermission(user, "files.delete") : false}
         canDownloadFiles={user ? hasPermission(user, "files.download") || hasPermission(user, "files.upload") : false}
+        dependenciesByMilestone={dependenciesByMilestone}
+        milestoneOptions={milestoneOptions}
       />
     </div>
   );
