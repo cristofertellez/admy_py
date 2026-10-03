@@ -166,6 +166,14 @@ Preparación para producción
 - [x] Épica 11 — Dashboards por rol: DeveloperPanel (KPIs clicables, gráficos de estados y horas, proyectos en riesgo, actividad/comentarios/archivos recientes), ClientPanel (sus proyectos con progreso, hitos y entregas), IntermediaryPanel refactorizado a widgets compartidos (11.2/11.3/11.4)
 - [x] Épica 11 — DashboardService: consultas agregadas batcheadas sin N+1, riesgo de portafolio (11.10), retrasos reales (delayedProjects antes en 0) y comentarios recientes de las 4 superficies
 - [x] Limpieza: eliminados `dashboard-charts.tsx` y `hooks/use-dashboard.ts` (código muerto)
+- [x] Centro de Reportes: 7 reportes por módulo (proyectos/tareas/hitos/horas/clientes/intermediarios/productividad) con KPIs, gráficos de barra/pastel/línea y exportación PDF/CSV/Excel reutilizable (`lib/exports`, `lib/export-pdf`)
+- [x] Épica 13 — Notificaciones: preferencias por usuario (canales, frecuencia, horas silenciosas, tipos), modelo de suscripciones push (preparado), expansión de destinatarios (miembros/intermediarios/usuario cliente), recordatorios automáticos (entregas, hitos, tareas vencidas, proyectos inactivos, comentarios sin responder), centro de notificaciones con KPIs/filtros/búsqueda/paginación/agrupación por fecha, campana con no leídas, marcar/descartar/restaurar, arquitectura de email con transporte conector y auditoría de lectura/descarte/preferencias
+- [x] Tareas: dependencias con validación de ciclos y bloqueo de completado, vistas Kanban (drag & drop auditado), Calendario mensual (tareas + entregas de hitos) y Timeline Gantt en `/dashboard/tasks`, indicadores automáticos (horas restantes, retraso, productividad, estado general), búsqueda global ampliada (responsable/proyecto/etiquetas), auditoría de checklists/asignación/prioridad y notificaciones de tarea
+- [x] Hitos: dependencias entre hitos con ciclos validados, panel de gestión Depends on/Blocks y carga batcheada por proyecto (8.8)
+- [x] Dashboard: personalización de widgets por rol (visibilidad + orden + restaurar), filtros globales en URL (proyecto/cliente/estado/prioridad/fechas) aplicados a los servicios, exportación PDF/CSV/Excel del dashboard y auditoría de exportaciones/layout/accesos (11.11–11.13/11.17)
+- [x] Auditoría: exportación del Activity Log (PDF/CSV/Excel), política de retención con ajuste `audit_retention_days`, filtro de eventos de seguridad, `login_failed`, detalles old→new en la tabla y cierre de auditoría de tareas/hitos (16.4/16.5/16.8/16.11–16.15)
+- [x] PWA: datos locales de recientes con accesos rápidos offline, prompt de actualización ("Update now"/"Remind later") según ajuste `pwa_auto_updates`, jsPDF lazy (menos bundle), categoría de ajustes PWA, auditoría del ciclo PWA vía `/api/pwa/events` y checklist de compatibilidad (14.6/14.9–14.15)
+- [x] Épica 17 — API pública v1 read-only (proyectos/tareas/clientes/hitos + OpenAPI + rate limiting + API keys hasheadas con UI en `/dashboard/integrations`), webhooks firmados con cola de reintentos e historial, bus de eventos internos (`system_events` + `after()`), reglas de automatización, feed ICS de calendario, importación CSV de clientes/proyectos con validación en dos fases, exportación global ZIP, `/api/health` y `docs/ROADMAP.md` (v2–v4)
 
 ---
 
@@ -1265,7 +1273,7 @@ Auditoría Administrativa
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3184,16 +3192,18 @@ Prioridades
 
 ### Backend
 
-- [ ] Configurar prioridades
+- [x] Configurar prioridades
 
 ### Frontend
 
 - [x] Indicadores visuales
 - [x] Filtros
 
+Implementación: prioridades en `tasks.priority` (constants + catálogo configurable `task_priorities` en Ajustes, Historia 15.15), validadas con Zod y catálogo en cada server action (`assertTaskCatalogStatusPriority`), con badges por severidad (Urgent/Critical en error) en lista, Kanban y detalle.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3275,16 +3285,18 @@ Permitir definir
 
 ### Backend
 
-- [ ] CRUD dependencias
-- [ ] Validar ciclos
+- [x] CRUD dependencias
+- [x] Validar ciclos
 
 ### QA
 
-- [ ] Detectar dependencias inválidas
+- [x] Detectar dependencias inválidas
+
+Implementación: CRUD en `TasksService.addDependency/removeDependency` con validación de duplicados, autorreferencia (CHECK en `task_dependencies`) y detección de ciclos (BFS sobre la cadena). Una tarea no puede completarse con dependencias sin terminar (`getUnfinishedDependencies` se aplica en edición, toggle y acciones masivas con mensajes legibles). Auditoría `added_task_dependency`/`removed_task_dependency` (7.23).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3298,18 +3310,20 @@ Asignación de Responsables
 
 ### Backend
 
-- [ ] Asignar usuario
-- [ ] Reasignar
-- [ ] Registrar auditoría
+- [x] Asignar usuario
+- [x] Reasignar
+- [x] Registrar auditoría
 
 ### Frontend
 
-- [ ] Selector de usuarios
-- [ ] Indicador del responsable
+- [x] Selector de usuarios
+- [x] Indicador del responsable
+
+Implementación: asignación/reasignación vía `updateTask` (`assigned_to` con opciones de `UsersService.listAssigneeOptions`, visibilidad validada en capa de datos) con evento de auditoría dedicado `assigned_task` y notificación in-app al responsable (`notifyTaskAssigned`, Historia 7.20). Indicador de responsable en lista (columna Assignee), Kanban y cabecera del detalle.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3392,14 +3406,16 @@ Columnas
 
 ### Funciones
 
-- [ ] Drag & Drop
-- [ ] Contadores
-- [ ] Indicadores
+- [x] Drag & Drop
+- [x] Contadores
+- [x] Indicadores
 - [ ] Scroll infinito (futuro)
+
+Implementación: `/dashboard/tasks?view=kanban` con `KanbanBoard` reutilizado (columnas dinámicas desde el catálogo de estados), tarjetas con prioridad, responsable, proyecto y chip Overdue, y contador por columna. El drag & drop llama a `bulkUpdateTaskStatus` (auditado), de modo que transiciones inválidas y dependencias se validan en el servidor; los errores se gestionan con la respuesta de la acción.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3436,14 +3452,16 @@ Vista Calendario
 
 Mostrar
 
-- Inicio
-- Fecha límite
-- Retrasos
-- Entregas
+- [x] Inicio
+- [x] Fecha límite
+- [x] Retrasos
+- [x] Entregas
+
+Implementación: `/dashboard/tasks?view=calendar&month=YYYY-MM` — grilla mensual navegable con las tareas de su fecha límite (rojo + "!" para vencidas) y las entregas de hitos del mes (`MilestonesService.getCalendarMilestones`, batch y con scope). El mes vive en la URL (compartible y cacheable offline por el SW).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3457,14 +3475,16 @@ Vista Timeline
 
 Mostrar
 
-- Inicio
-- Avance
-- Cambios
-- Eventos importantes
+- [x] Inicio
+- [x] Avance
+- [x] Cambios
+- [x] Eventos importantes
+
+Implementación: `/dashboard/tasks?view=timeline` — barras Gantt por tarea (inicio → fin estimados, ancho proporcional sobre el rango visible, overlay de progreso, color por estado, anillo de retraso y marcador de hoy). Las tareas sin fechas se agrupan en "Unscheduled" con badge de estado; cada barra enlaza al detalle.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3486,7 +3506,7 @@ Etiquetas
 - [x] Colores
 - [x] Filtros
 
-Implementación: CRUD de etiquetas en `/dashboard/tags` con paleta compartida (`TAG_COLOR_OPTIONS`, esquema Zod) y auditoría. Asignación a tareas (Historia 7.17): `TagsService.listByTask/setTaskTags` (reemplazo transaccional), acción `updateTaskTags` con guard `tasks.update` y auditoría `updated_task_tags`; tarjeta Tags en `/dashboard/tasks/[id]` reutilizando `TagSelector`/`TagChip` (solo lectura sin permiso).
+Implementación: CRUD de etiquetas en `/dashboard/tags` con paleta compartida (`TAG_COLOR_OPTIONS`, esquema Zod) y auditoría. Asignación a tareas (Historia 7.17): `TagsService.listByTask/setTaskTags` (reemplazo transaccional), acción `updateTaskTags` con guard `tasks.update` y auditoría `updated_task_tags`; tarjeta Tags en `/dashboard/tasks/[id]` reutilizando `TagSelector`/`TagChip` (solo lectura sin permiso). La búsqueda global de tareas incluye etiquetas (7.21).
 
 Estado
 
@@ -3504,15 +3524,17 @@ Indicadores Automáticos
 
 Calcular
 
-- % completado
-- Horas restantes
-- Retraso
-- Productividad
-- Estado general
+- [x] % completado
+- [x] Horas restantes
+- [x] Retraso
+- [x] Productividad
+- [x] Estado general
+
+Implementación: la página de detalle calcula e indica (junto a las tarjetas de progreso/horas existentes): horas restantes (estimadas − trabajadas), retraso (`+Nd` si `estimated_end` vencida y no completada, en rojo), productividad (trabajadas/estimadas) y estado general derivado (Completed / Blocked / At risk / Hours overrun / Healthy). Los KPIs ya existentes cubren % completado, estimadas, trabajadas y subtareas.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3526,21 +3548,23 @@ Actividad
 
 Registrar automáticamente
 
-- Creación
-- Edición
-- Cambio de estado
-- Cambio de responsable
-- Comentarios
-- Archivos
-- Tiempo registrado
+- [x] Creación
+- [x] Edición
+- [x] Cambio de estado
+- [x] Cambio de responsable
+- [x] Comentarios
+- [x] Archivos
+- [x] Tiempo registrado
 
 ### Frontend
 
-- [ ] Timeline
+- [x] Timeline
+
+Implementación: todos los eventos se escriben en `activity_logs` desde las acciones (`created_task`, `updated_task`, `changed_task_status`, `assigned_task`, `changed_task_priority`, `updated_task_progress`, comentarios/archivos/time entries con sus acciones dedicadas). La tarjeta History de `/dashboard/tasks/[id]` renderiza el timeline con `ActivityTimeline` reutilizado, con detalles de sujeto y transiciones `old → new`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3554,16 +3578,18 @@ Notificaciones
 
 Enviar cuando
 
-- Se asigna una tarea
-- Cambia el estado
-- Se acerca la fecha límite
-- La tarea está bloqueada
-- Se completa la tarea
-- Hay un nuevo comentario
+- [x] Se asigna una tarea
+- [x] Cambia el estado
+- [x] Se acerca la fecha límite
+- [x] La tarea está bloqueada
+- [x] Se completa la tarea
+- [x] Hay un nuevo comentario
+
+Implementación (Épica 13): `notifyTaskAssigned`, `notifyTaskStatusChanged` (con título/tipo específicos para Blocked y Completed), recordatorios de vencimiento idempóticos por día (`task_due_soon` para el responsable en `syncTimeBasedNotifications`) y `notifyCommentCreated` con menciones. Todos respetan las preferencias por usuario (13.6) y publican el evento interno equivalente (17.7).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3577,16 +3603,18 @@ Búsqueda Global
 
 Buscar por
 
-- Nombre
-- Responsable
-- Proyecto
-- Etiquetas
-- Estado
-- Prioridad
+- [x] Nombre
+- [x] Responsable
+- [x] Proyecto
+- [x] Etiquetas
+- [x] Estado
+- [x] Prioridad
+
+Implementación: `TasksService.list` resuelve la búsqueda contra título, descripción, estado, prioridad, proyecto (JOIN) y responsable (primer y apellido), más un `EXISTS` sobre `task_tags`/`tags` para las etiquetas; la consulta de conteo incluye los mismos JOIN. Los filtros selectores de la vista Lista cubren directamente proyecto/responsable/estado/prioridad.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3600,34 +3628,36 @@ Permisos
 
 Developer
 
-- [ ] Gestión completa
+- [x] Gestión completa
 
 Intermediary
 
-- [ ] Visualizar tareas permitidas
-- [ ] Comentar tareas permitidas
+- [x] Visualizar tareas permitidas
+- [x] Comentar tareas permitidas
 
 Client
 
-- [ ] Solo visualizar tareas compartidas
+- [x] Solo visualizar tareas compartidas
 
 Administrator
 
-- [ ] Gestión completa
+- [x] Gestión completa
 
 Super Administrator
 
-- [ ] Acceso total
+- [x] Acceso total
 
 ### QA
 
-- [ ] RBAC
-- [ ] Control de acceso a datos
-- [ ] Accesos indebidos
+- [x] RBAC
+- [x] Control de acceso a datos
+- [x] Accesos indebidos
+
+Implementación: cada server action de tareas aplica `requirePermission("tasks.*")` (guards por operación) y las lecturas usan `projectScope`/`assertTaskVisible` de `lib/auth-scope.ts`, de modo que Intermediary/Client solo alcanzan tareas de su cartera; los intentos indebidos se registran como `access_denied`. El Kanban y las acciones en UI se ocultan sin permiso (`hasPermission` en página) y el servidor revalida siempre.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3641,19 +3671,21 @@ Auditoría
 
 Registrar
 
-- Creación
-- Edición
-- Eliminación lógica
-- Asignaciones
-- Cambios de estado
-- Tiempo registrado
-- Dependencias
-- Subtareas
-- Checklists
+- [x] Creación
+- [x] Edición
+- [x] Eliminación lógica
+- [x] Asignaciones
+- [x] Cambios de estado
+- [x] Tiempo registrado
+- [x] Dependencias
+- [x] Subtareas
+- [x] Checklists
+
+Implementación: eventos dedicados en `activity_logs` — `created_task`/`updated_task` (diff por campo), `assigned_task`, `changed_task_priority`, `changed_task_status`, `updated_task_progress`, `archived_task`/`restored_task`, `created_time_entry`/`deleted_time_entry`, `added_task_dependency`/`removed_task_dependency` (7.9), `created_subtask`/`moved_subtask` y `created_checklist_item`/`toggled_checklist_item`/`deleted_checklist_item` (actions/checklists.ts).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3667,18 +3699,20 @@ Integración con otros módulos
 
 Integraciones
 
-- Proyectos
-- Comentarios
-- Archivos
-- Notificaciones
-- Dashboard
-- Reportes
-- Auditoría
-- Calendario
+- [x] Proyectos
+- [x] Comentarios
+- [x] Archivos
+- [x] Notificaciones
+- [x] Dashboard
+- [x] Reportes
+- [x] Auditoría
+- [x] Calendario
+
+Implementación: las tareas se crean/editan dentro del contexto del proyecto (`/dashboard/projects/[id]/tasks`), comentan y adjuntan con los módulos compartidos, notifican vía Épica 13, alimentan los KPIs/widgets del Dashboard (11.x) y el centro de Reportes, auditán cada operación (7.23) y exponen vista Calendario con entregas de hitos (7.15). El bus de eventos interno publica `task.*` para webhooks/automatizaciones (17.7).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -3966,16 +4000,18 @@ Permitir definir
 
 ### Backend
 
-- [ ] CRUD dependencias
-- [ ] Validar ciclos
+- [x] CRUD dependencias
+- [x] Validar ciclos
 
 ### QA
 
-- [ ] Dependencias válidas
+- [x] Dependencias válidas
+
+Implementación: migración `00012_milestone_dependencies` (UNIQUE + CHECK anti-autorreferencia) con `MilestonesService.addMilestoneDependency/removeMilestoneDependency/getDependencies/getProjectDependencies/getAvailableMilestonesForDependency`, detección de ciclos idéntica al flujo de tareas (BFS) y acciones auditadas `added_milestone_dependency`/`removed_milestone_dependency`. UI: acción "Dependencies" por hito en `/dashboard/projects/[id]/milestones` con panel Depends on / Blocks, tipos (Finish to Start, Start to Start, Related) y dependencias cargadas en una sola consulta por proyecto.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5458,14 +5494,16 @@ Dashboard Personalizable
 
 Permitir
 
-- [ ] Reordenar widgets
-- [ ] Mostrar u ocultar widgets
-- [ ] Guardar configuración
-- [ ] Restaurar configuración
+- [x] Reordenar widgets
+- [x] Mostrar u ocultar widgets
+- [x] Guardar configuración
+- [x] Restaurar configuración
+
+Implementación: registro de widgets por panel (`features/dashboard/dashboard-widgets.ts`: Developer 8, Client 5, Intermediary 3), panel "Customize" en el dashboard (checkbox de visibilidad + flechas de orden) y persistencia en `users.dashboard_preferences` vía `PreferencesService` con validación de ids desconocidos en el servidor. `resolveWidgetLayout` ordena/oculta widgets en los tres paneles (la fila de KPIs permanece fija) y "Restore defaults" vuelve al layout original. La acción `updateDashboardLayout` audita el cambio (11.17).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5479,16 +5517,18 @@ Filtros Globales
 
 Permitir filtrar por
 
-- Proyecto
-- Cliente
-- Intermediario
-- Fecha
-- Estado
-- Prioridad
+- [x] Proyecto
+- [x] Cliente
+- [ ] Intermediario
+- [x] Fecha
+- [x] Estado
+- [x] Prioridad
+
+Implementación: barra de filtros en el dashboard con estado en URL (`?project&client&status&priority&from&to`) validada contra listas de opciones; `DashboardService` acepta `DashboardFilters` y los aplica a los conteos del scope, tareas vencidas, hitos próximos, riesgo, entregas próximas, comentarios y archivos (fragments `projectFilterFragment`/`taskFilterFragment`, arg-count preservado). El filtro de Cliente se ofrece al Developer; el filtro directo por Intermediario queda pendiente (la cartera del cliente cubre el caso Intermediary).
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5502,13 +5542,15 @@ Exportación
 
 Exportar Dashboard como
 
-- [ ] PDF
+- [x] PDF
 - [ ] Imagen
-- [ ] Excel (datos)
+- [x] Excel (datos)
+
+Implementación: `DashboardService.getDashboardReport` materializa el dashboard filtrado como `ModuleReport` y se reutilizan los exporters compartidos — PDF en el cliente (`exportReportPdf`, jsPDF cargado on demand) y CSV/XLSX vía `/api/dashboard/export` con los mismos filtros. Ambas rutas auditan `exported_dashboard` (11.17). Imagen pendiente: requiere html2canvas (dependencia nueva, evaluada para v1.1).
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -5602,14 +5644,16 @@ Auditoría
 
 Registrar
 
-- [ ] Exportaciones
-- [ ] Cambios de configuración
-- [ ] Widgets personalizados
-- [ ] Accesos al Dashboard
+- [x] Exportaciones
+- [x] Cambios de configuración
+- [x] Widgets personalizados
+- [x] Accesos al Dashboard
+
+Implementación: `exported_dashboard` (acción + ruta de export, con dedupe `logAccessOnce`), `updated_settings`/`restored_settings`/`imported_settings` (categorías de configuración), `updated_dashboard_layout` (guardado del layout por panel) y `viewed_dashboard` con ventana de dedupe de 60s para no inundar el registro en navegación rutinaria. Todos los eventos son visibles en el Activity Log con clasificación de seguridad (16.13).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6138,21 +6182,23 @@ Crear un centro unificado donde cada usuario pueda consultar todas sus notificac
 
 ### Backend
 
-- [ ] Obtener notificaciones
-- [ ] Paginación
-- [ ] Búsqueda
+- [x] Obtener notificaciones
+- [x] Paginación
+- [x] Búsqueda
 - [x] Filtros
 
 ### Frontend
 
-- [ ] Panel de notificaciones
-- [ ] Indicador de no leídas
-- [ ] Agrupación por fecha
+- [x] Panel de notificaciones
+- [x] Indicador de no leídas
+- [x] Agrupación por fecha
 - [ ] Scroll infinito
+
+Implementación: `/dashboard/notifications` con KPIs (Total/Unread/Today/This week), filtros por texto, tipo, estado de lectura y rango de fechas en URL, paginación real y agrupación por día (Today/Yesterday/fecha). El header muestra la campana con el contador de no leídas (`NotificationsBell`, renderizado del servidor en el layout del dashboard). Pendiente: scroll infinito (la paginación cubre el recorrido del histórico).
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -6166,20 +6212,22 @@ Notificaciones In-App
 
 Generar automáticamente cuando ocurra alguno de los siguientes eventos.
 
-- [ ] Proyecto creado
-- [ ] Proyecto actualizado
+- [x] Proyecto creado
+- [x] Proyecto actualizado
 - [x] Cambio de estado
-- [ ] Nueva tarea
-- [ ] Nueva subtarea
-- [ ] Nuevo comentario
-- [ ] Nuevo archivo
-- [ ] Hito completado
-- [ ] Fecha límite próxima
-- [ ] Proyecto finalizado
+- [x] Nueva tarea
+- [x] Nueva subtarea
+- [x] Nuevo comentario
+- [x] Nuevo archivo
+- [x] Hito completado
+- [x] Fecha límite próxima
+- [x] Proyecto finalizado
+
+Implementación: `notification-triggers.ts` cubre todos los eventos (proyecto creado/actualizado/estado/finalizado, tarea creada/subtarea/comentario/mención/archivo/hito completado) y `syncTimeBasedNotifications` genera los basados en tiempo (proyectos retrasados, vencimientos de proyectos e hitos) de forma idempótene por día. Los destinatarios se resuelven con `getProjectRecipients` (miembros del proyecto, intermediarios de proyecto y cliente, y usuario Cliente vinculado por email) respetando las preferencias por usuario (13.6).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6193,26 +6241,30 @@ Notificaciones por Correo Electrónico
 
 Permitir enviar correos cuando exista.
 
-- [ ] Asignación de proyecto
-- [ ] Cambio importante
-- [ ] Comentario mencionado
-- [ ] Recordatorio
-- [ ] Entrega próxima
-- [ ] Proyecto finalizado
+- [x] Asignación de proyecto
+- [x] Cambio importante
+- [x] Comentario mencionado
+- [x] Recordatorio
+- [x] Entrega próxima
+- [x] Proyecto finalizado
 
 Configuración
 
-- [ ] Activar
-- [ ] Desactivar
-- [ ] Personalizar frecuencia
+- [x] Activar
+- [x] Desactivar
+- [x] Personalizar frecuencia
+
+Implementación: `EmailService` (features/notifications) define la arquitectura de transporte con `ConsoleTransport`: hasta que se configure un proveedor SMTP (variables SMTP_*), los correos se registran en log — sin dependencias externas (AGENTS.md). `dispatchEmailSideChannel` respeta la preferencia de canal, la frecuencia (instant/digest) y las horas silenciosas de cada usuario; la activación/desactivación y frecuencia viven en las preferencias de notificación (13.6).
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
 P1
+
+Nota: el transporte SMTP real (Resend/SES/Nodemailer) queda pendiente de proveedor; la interfaz permite conectarlo sin tocar los call sites.
 
 ---
 
@@ -6224,18 +6276,20 @@ Preparar la arquitectura para futuras notificaciones Push en la PWA.
 
 ### Backend
 
-- [ ] Modelo de suscripción
-- [ ] Registro de dispositivos
-- [ ] Gestión de tokens
+- [x] Modelo de suscripción
+- [x] Registro de dispositivos
+- [x] Gestión de tokens
 
 ### Frontend
 
 - [ ] Solicitar permisos
-- [ ] Registrar dispositivo
+- [x] Registrar dispositivo
+
+Implementación: tabla `push_subscriptions` (migración 00011) con endpoint/auth/p256dh/auth por usuario, acciones `registerPushSubscription`/`removePushSubscription` (Zod, auditadas) y preferencia `push_enabled`. El Service Worker incluye los handlers `push` y `notificationclick` (14.12) con navegación al dashboard. Pendiente: solicitar permisos del navegador y entrega real, que requieren claves VAPID del proveedor que se elija.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -6249,15 +6303,17 @@ Recordatorios Automáticos
 
 Enviar recordatorios para.
 
-- [ ] Próximas entregas
-- [ ] Hitos próximos
-- [ ] Tareas vencidas
-- [ ] Proyectos sin actividad
-- [ ] Comentarios sin responder
+- [x] Próximas entregas
+- [x] Hitos próximos
+- [x] Tareas vencidas
+- [x] Proyectos sin actividad
+- [x] Comentarios sin responder
+
+Implementación: `syncTimeBasedNotifications` genera todos los recordatorios de forma idempótene por día (dedupe keys por receptor) en cada carga del dashboard/centro de notificaciones, respetando los ajustes globales `reminder_enabled`/`reminder_days` y las preferencias por usuario: proyectos retrasados y vencimientos de proyecto/hito (7 días por defecto, configurable), tareas vencidas/por vencer para el responsable, proyectos sin actividad en 14 días y comentarios raíz sin respuesta tras 3 días.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6271,14 +6327,16 @@ Preferencias de Notificaciones
 
 Permitir configurar.
 
-- [ ] Canales
-- [ ] Frecuencia
-- [ ] Horario permitido
-- [ ] Tipos de eventos
+- [x] Canales
+- [x] Frecuencia
+- [x] Horario permitido
+- [x] Tipos de eventos
+
+Implementación: tabla `notification_preferences` (migración 00011) con canal in-app/email/push, frecuencia de correo (instant/daily/weekly), horas silenciosas (HH:MM) y lista de tipos de evento (JSON; null = todos). La UI "Notification preferences" del centro de notificaciones guarda vía `updateNotificationPreferences` (Zod + auditoría `updated_notification_preferences`) y `NotificationsService.create` aplica las preferencias en cada envío.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6292,23 +6350,25 @@ Centro de Actividad
 
 Mostrar cronológicamente.
 
-- [ ] Cambios de proyectos
-- [ ] Cambios de tareas
-- [ ] Comentarios
-- [ ] Archivos
-- [ ] Hitos
-- [ ] Asignaciones
+- [x] Cambios de proyectos
+- [x] Cambios de tareas
+- [x] Comentarios
+- [x] Archivos
+- [x] Hitos
+- [x] Asignaciones
 
 Filtros
 
-- Usuario
-- Proyecto
-- Fecha
-- Tipo de actividad
+- [x] Usuario
+- [ ] Proyecto
+- [x] Fecha
+- [x] Tipo de actividad
+
+Implementación: `/dashboard/activity` concentra el registro completo (`ActivityLogService.list`) con vistas Tabla y Timeline, búsqueda de acción/entidad, filtros de usuario/entidad/fecha y detalle de cambios old→new por fila (16.8); el filtro directo por proyecto queda pendiente (el buscador y el filtro por entidad cubren parcialmente el caso). Los eventos de acceso y seguridad se registran con normalización (ACCESS/SECURITY_AUDIT_ACTIONS).
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -6322,15 +6382,17 @@ Notificaciones Inteligentes
 
 Evitar.
 
-- [ ] Duplicados
-- [ ] Spam
-- [ ] Eventos repetitivos
+- [x] Duplicados
+- [x] Spam
+- [x] Eventos repetitivos
 
 Agrupar automáticamente eventos relacionados.
 
+Implementación: `dedupe_key` con índice UNIQUE parcial (migración 00005) — cada evento define su clave (por comentario, por tarea, por receptor y día en los basados en tiempo) y `create` verifica antes de insertar. El anti-spam se garantiza con las preferencias por usuario (13.6), las ventanas diarias de los recordatorios y `logAccessOnce` para eventos de acceso. La agrupación visual por fecha junta los eventos relacionados de cada jornada en el centro de notificaciones.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6344,13 +6406,15 @@ Marcar como Leídas
 
 Permitir.
 
-- [ ] Marcar individualmente
-- [ ] Marcar todas
-- [ ] Restaurar estado (opcional)
+- [x] Marcar individualmente
+- [x] Marcar todas
+- [x] Restaurar estado (opcional)
+
+Implementación: acciones `markAsRead`/`markAsUnread`/`markAllAsRead` (scope por receptor en el UPDATE, auditoría `marked_notification_read` con dedupe y `marked_all_notifications_read`). "Marcar unread" restaura el estado; además existe "Dismiss" (ocultado lógico con `dismissed_at`, 13.13).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6364,15 +6428,17 @@ Búsqueda
 
 Buscar notificaciones por.
 
-- Texto
-- Proyecto
-- Usuario
-- Fecha
-- Tipo
+- [x] Texto
+- [ ] Proyecto
+- [x] Usuario
+- [x] Fecha
+- [x] Tipo
+
+Implementación: `NotificationsService.list` soporta búsqueda LIKE sobre título y mensaje, filtro por tipo, estado de lectura y rango de fechas (`from`/`to`), expuestos en el centro de notificaciones con estado en URL. "Usuario" es implícito (cada usuario solo ve sus notificaciones); el filtro por proyecto queda pendiente.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -6386,27 +6452,29 @@ Notificaciones por Rol
 
 Developer
 
-- Cambios internos
-- Asignaciones
-- Comentarios
-- Archivos
+- [x] Cambios internos
+- [x] Asignaciones
+- [x] Comentarios
+- [x] Archivos
 
 Intermediary
 
-- Proyectos asignados
-- Comentarios visibles
-- Entregas
+- [x] Proyectos asignados
+- [x] Comentarios visibles
+- [x] Entregas
 
 Client
 
-- Avance
-- Entregas
-- Archivos compartidos
-- Cambios importantes
+- [x] Avance
+- [x] Entregas
+- [x] Archivos compartidos
+- [x] Cambios importantes
+
+Implementación: `getProjectRecipients` resuelve la audiencia por rol — miembros del proyecto y responsables (Developers), intermediarios de proyecto/cliente (Intermediary) y el usuario Cliente vinculado por email — aplicando los mismos criterios de visibilidad que `lib/auth-scope.ts`. Cada tipo de notificación llega al rol correspondiente (asignaciones al responsable, entregas/cambios a toda la audiencia, menciones directas).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6420,15 +6488,17 @@ Indicadores
 
 Mostrar.
 
-- Total
-- No leídas
-- Hoy
-- Esta semana
-- Por tipo
+- [x] Total
+- [x] No leídas
+- [x] Hoy
+- [x] Esta semana
+- [x] Por tipo
+
+Implementación: `NotificationsService.getStats` agrega total, no leídas, hoy, últimos 7 días y distribución por tipo en consultas COUNT paralelas; se muestran como tarjetas KPI del centro de notificaciones y el contador de no leídas de la campana del header (viaje diario del usuario).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6442,14 +6512,16 @@ Auditoría
 
 Registrar.
 
-- Notificación enviada
-- Notificación leída
-- Notificación descartada
-- Cambio de preferencias
+- [ ] Notificación enviada
+- [x] Notificación leída
+- [x] Notificación descartada
+- [x] Cambio de preferencias
+
+Implementación: `marked_notification_read` (con ventana de dedupe vía `logAccessOnce`), `dismissed_notification` (dismiss con `dismissed_at`), `marked_all_notifications_read` y `updated_notification_preferences` viven en el Activity Log. El "envío" no se audita por evento: la propia notificación es el registro persistente (y su volumen haría ruido el log); los errores de triggers quedan en consola del servidor.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -6463,27 +6535,29 @@ Permisos
 
 Developer
 
-- [ ] Gestión de sus notificaciones
+- [x] Gestión de sus notificaciones
 
 Intermediary
 
-- [ ] Gestión de sus notificaciones
+- [x] Gestión de sus notificaciones
 
 Client
 
-- [ ] Gestión de sus notificaciones
+- [x] Gestión de sus notificaciones
 
 Administrator
 
-- [ ] Configuración global
+- [x] Configuración global
 
 Super Administrator
 
-- [ ] Acceso completo
+- [x] Acceso completo
+
+Implementación: cada usuario solo ve y gestiona sus propias notificaciones y preferencias (todos los UPDATE/SELECT aplican `receiver_id = usuario` en el servidor); la configuración global (frecuencia, recordatorios, eventos) vive en Ajustes → Notifications con guard `settings.*` (Developer/Super Administrator) y `hasFullAccess` cubre el acceso completo.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6497,20 +6571,22 @@ Integración
 
 Integrar con.
 
-- Proyectos
-- Clientes
-- Intermediarios
-- Hitos
-- Tareas
-- Dashboard
-- Comentarios
-- Archivos
-- Reportes
-- Auditoría
+- [x] Proyectos
+- [x] Clientes
+- [x] Intermediarios
+- [x] Hitos
+- [x] Tareas
+- [x] Dashboard
+- [x] Comentarios
+- [x] Archivos
+- [x] Reportes
+- [x] Auditoría
+
+Implementación: los triggers se invocan desde las acciones de proyectos (creación/actualización/estado/finalización), tareas (creación/subtareas/asignación/estado), hitos (completado), comentarios (con menciones), archivos y clientes (`client.created`), todas auditadas. El dashboard sincroniza los recordatorios basados en tiempo en cada carga; el centro de Reportes y el Activity Log consumen los mismos eventos; el bus interno (17.7) replica cada evento hacia webhooks/automatizaciones.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6744,15 +6820,17 @@ Datos Locales
 
 Guardar temporalmente
 
-- Preferencias
-- Últimos proyectos
-- Últimas tareas
-- Configuración del Dashboard
-- Sesión cuando sea seguro hacerlo
+- [x] Preferencias
+- [x] Últimos proyectos
+- [x] Últimas tareas
+- [x] Configuración del Dashboard
+- [x] Sesión cuando sea seguro hacerlo
+
+Implementación: preferencias (idioma/zona horaria/tema) y configuración del dashboard (layout de widgets, 11.11) persisten en la base de datos del usuario y se sirven al render; "Últimos proyectos/tareas" se registran en localStorage (`lib/recent.ts` con `TrackRecentView` en los detalles) y alimentan los accesos rápidos de la página `/offline`; la sesión permanece exclusivamente en cookies httpOnly — el Service Worker nunca intercepta `/auth/`, `/api/` ni guarda tokens.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6829,18 +6907,20 @@ Actualizaciones Automáticas
 
 Detectar
 
-- Nueva versión disponible
-- Actualización instalada
-- Reinicio necesario
+- [x] Nueva versión disponible
+- [x] Actualización instalada
+- [x] Reinicio necesario
 
 Permitir
 
-- Actualizar ahora
-- Recordar después
+- [x] Actualizar ahora
+- [x] Recordar después
+
+Implementación: `ServiceWorkerRegister` respeta el ajuste `pwa_auto_updates` (Ajustes → PWA, 14.13): con actualización automática mantiene el ciclo SKIP_WAITING + reload; desactivado muestra el diálogo "A new version is available" con "Update now"/"Remind later" y recarga controlada al activarse. La detección corre cada hora y al volver a la pestaña; el evento `pwa_updated` se audita (14.14).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6854,15 +6934,17 @@ Optimización de Rendimiento
 
 Optimizar
 
-- Lazy Loading
-- Code Splitting
-- Prefetch
-- Precarga de recursos
-- Imágenes optimizadas
+- [x] Lazy Loading
+- [x] Code Splitting
+- [x] Prefetch
+- [x] Precarga de recursos
+- [ ] Imágenes optimizadas
+
+Implementación: jsPDF/jspdf-autotable (la dependencia más pesada del cliente) se cargan on demand dentro de `exportReportPdf`; los componentes pesados (Kanban, gráficos) se trocean por ruta en el build; Next.js prefetchea los `<Link>` del sidebar por defecto; el Service Worker precachea offline/manifest/iconos y sirve estáticos cache-first. Pendiente: migrar `<img>` (avatars, vista previa de archivos) a `next/image`.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -6876,21 +6958,23 @@ Compatibilidad
 
 Validar funcionamiento en
 
-- Chrome
-- Edge
-- Firefox
-- Safari
+- [ ] Chrome
+- [ ] Edge
+- [ ] Firefox
+- [ ] Safari
 
 Dispositivos
 
-- Escritorio
-- Tablet
-- Android
-- iPhone
+- [ ] Escritorio
+- [ ] Tablet
+- [ ] Android
+- [ ] iPhone
+
+Implementación: checklist de verificación documentado en `docs/qa/historia-14.11-compatibilidad-pwa.md` (matriz navegador/dispositivo, instalación, offline, cola de acciones, actualizaciones con prompt y hallazgos conocidos: maximumScale en viewport y límites de Web Push en iOS). La validación física en dispositivos queda pendiente de ejecutarse.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -6904,17 +6988,19 @@ Notificaciones Push (Preparado)
 
 Preparar soporte para
 
-- Recordatorios
-- Comentarios
-- Cambios de proyecto
-- Cambios de tareas
-- Próximas entregas
+- [x] Recordatorios
+- [x] Comentarios
+- [x] Cambios de proyecto
+- [x] Cambios de tareas
+- [x] Próximas entregas
 
 La implementación dependerá del proveedor seleccionado en el futuro.
 
+Implementación: handlers `push`/`notificationclick` en el Service Worker (payload JSON con título/cuerpo/url, tag deduplicado, enfoque de la ventana existente), tabla `push_subscriptions` + acciones de registro (13.4) y tipos de notificación ya generados por la plataforma (recordatorios, comentarios, cambios de proyectos/tareas y entregas). Solo falta el proveedor VAPID para activar la entrega.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6928,15 +7014,17 @@ Configuración de la PWA
 
 Permitir configurar
 
-- Actualizaciones automáticas
-- Uso de datos
-- Caché
-- Notificaciones
-- Sincronización
+- [x] Actualizaciones automáticas
+- [ ] Uso de datos
+- [x] Caché
+- [x] Notificaciones
+- [x] Sincronización
+
+Implementación: nueva categoría "Progressive Web App" en Ajustes con `pwa_auto_updates` (aplicado en el flujo de actualización del SW, 14.9), `pwa_offline_cache`, `pwa_background_sync` y `pwa_notification...` vía preferencias de usuario (13.6). Nota: offline cache y background sync están documentados como flags operativos; el SW siempre cachea páginas visitadas y la cola se sincroniza al reconectar, de modo que su aplicación estricta (desactivar caché/sync) queda como refinamiento pendiente junto al presupuesto de uso de datos.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -6950,15 +7038,17 @@ Auditoría
 
 Registrar
 
-- Instalación
-- Actualización
-- Sincronización
-- Errores Offline
-- Recuperación de conexión
+- [x] Instalación
+- [x] Actualización
+- [x] Sincronización
+- [x] Errores Offline
+- [x] Recuperación de conexión
+
+Implementación: endpoint `POST /api/pwa/events` (autenticado, tipos `installed|updated|sync_completed|offline_error|reconnected`, con `logAccessOnce` para no duplicar). `InstallPrompt` audita la instalación aceptada, `ServiceWorkerRegister` la actualización aplicada, y `useOfflineQueue` audita `sync_completed` (acciones sincronizadas) y `offline_error` (fallos de ejecución) — la recuperación de conexión se materializa en el propio `sync_completed` al procesar la cola.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6972,19 +7062,21 @@ Integración
 
 Integrar con
 
-- Dashboard
-- Proyectos
-- Tareas
-- Hitos
-- Comentarios
-- Archivos
-- Notificaciones
-- Configuración
-- Auditoría
+- [x] Dashboard
+- [x] Proyectos
+- [x] Tareas
+- [x] Hitos
+- [x] Comentarios
+- [x] Archivos
+- [x] Notificaciones
+- [x] Configuración
+- [x] Auditoría
+
+Implementación: la cola offline cubre comentarios de proyecto/tarea, edición de tareas/proyectos y completado (14.8); el cache del SW habilita el modo lectura de proyectos, tareas, hitos, dashboard y centro de notificaciones visitados; la campana de no leídas y los KPIs del dashboard se regeneran al reconectar; la configuración PWA y las preferencias de notificación son parte del flujo, y todos los eventos del ciclo PWA se auditan (14.14).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7549,17 +7641,19 @@ Auditoría de Tareas
 
 Registrar
 
-- Creación
-- Edición
-- Cambio de prioridad
-- Cambio de responsable
-- Cambio de estado
-- Registro de tiempo
-- Eliminación lógica
+- [x] Creación
+- [x] Edición
+- [x] Cambio de prioridad
+- [x] Cambio de responsable
+- [x] Cambio de estado
+- [x] Registro de tiempo
+- [x] Eliminación lógica
+
+Implementación: eventos dedicados por operación en `activity_logs` — `created_task` (con valores nuevos), `updated_task` (diff campo a campo), `changed_task_priority` y `assigned_task` (dedicados, Historias 7.10/7.23), `changed_task_status` (con transición old→new), `updated_task_progress`, `created_time_entry`/`deleted_time_entry` y `archived_task`/`restored_task`. Todos visibles en el timeline del detalle de tarea y en el Activity Log global.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7573,15 +7667,17 @@ Auditoría de Hitos
 
 Registrar
 
-- Creación
-- Actualización
-- Cambio de fechas
-- Cambio de estado
-- Asociación de tareas
+- [x] Creación
+- [x] Actualización
+- [x] Cambio de fechas
+- [x] Cambio de estado
+- [x] Asociación de tareas
+
+Implementación: `created_milestone`, `updated_milestone` (diff por campo, incluye fechas), `changed_milestone_status` (transición old→new), `updated_milestone_progress`, `assigned_task_to_milestone`/`removed_task_from_milestone`, `archived_milestone`/`restored_milestone`, `moved_milestone` y `added_milestone_dependency`/`removed_milestone_dependency` (8.8), todos escritos desde `actions/milestones.ts` con `ActivityService.log`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7646,24 +7742,26 @@ Historial de Cambios
 
 Mostrar
 
-- Valor anterior
-- Valor nuevo
-- Usuario responsable
-- Fecha
-- Hora
+- [x] Valor anterior
+- [x] Valor nuevo
+- [x] Usuario responsable
+- [x] Fecha
+- [x] Hora
 
 Aplicable a
 
-- Proyectos
-- Clientes
-- Intermediarios
-- Tareas
-- Hitos
-- Configuración
+- [x] Proyectos
+- [x] Clientes
+- [x] Intermediarios
+- [x] Tareas
+- [x] Hitos
+- [x] Configuración
+
+Implementación: cada evento de `activity_logs` persiste `old_value`/`new_value` como JSON; el Activity Log muestra columna "Changes" con el detalle expandible por fila (resumen `campo: valor anterior → valor nuevo`, `renderChangeSummary` en la tabla) y el timeline lo narra con `getActivityEventDetail`. La configuración registra diffs vía `updated_settings`/`restored_settings`/`imported_settings` (categoría Ajustes).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7728,13 +7826,15 @@ Exportación
 
 Permitir exportar auditorías
 
-- [ ] PDF
-- [ ] Excel
-- [ ] CSV
+- [x] PDF
+- [x] Excel
+- [x] CSV
+
+Implementación: botones Export PDF / CSV / Excel en el Activity Log — PDF vía `getActivityExportReport` (acción que audita `exported_activity` y devuelve el `ModuleReport` para el helper compartido) y CSV/XLSX vía `/api/activity/export` (mismos filtros que la página, hasta 5000 registros, auditoría incluida). Ambos reutilizan `lib/exports`/`lib/export-pdf`.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7748,13 +7848,15 @@ Retención de Registros
 
 Configurar
 
-- Tiempo de retención
-- Eliminación automática (cuando aplique)
-- Archivado histórico
+- [x] Tiempo de retención
+- [x] Eliminación automática (cuando aplique)
+- [x] Archivado histórico
+
+Implementación: ajuste `audit_retention_days` (Ajustes → Audit, 0 = conservar todo) ejecutado idempóneamente en cada visita al Activity Log (`ActivityLogService.applyRetentionPolicy` con cutoff ISO); la purga se audita como `purged_activity_logs` con el conteo eliminado. El archivado histórico se resuelve con la exportación ZIP global (17.11), que incluye hasta 5000 eventos del log.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7768,15 +7870,17 @@ Eventos de Seguridad
 
 Registrar
 
-- Accesos denegados
-- Errores de permisos
-- Intentos sospechosos
-- Bloqueos de cuenta
-- Cambios críticos
+- [x] Accesos denegados
+- [x] Errores de permisos
+- [x] Intentos sospechosos
+- [ ] Bloqueos de cuenta
+- [x] Cambios críticos
+
+Implementación: `access_denied` en cada denegación de la capa de datos (auth-scope) y `login_failed` en credenciales inválidas (email registrado, sin contraste); cambios críticos = `changed_password`, `changed_role`, `updated_permissions` y eventos de configuración. `SECURITY_AUDIT_ACTIONS` + el filtro "Security events only" del Activity Log aísla la vista forense. Pendiente: bloqueo de cuenta tras intentos fallidos (el ajuste `login_max_attempts` existe; la aplicación del lockout queda para seguridad v1.1).
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7794,23 +7898,24 @@ Developer
 
 Intermediary
 
-- Sin acceso
+- [x] Sin acceso
 
 Client
 
-- Sin acceso
+- [x] Sin acceso
 
 Administrator
 
-- Consulta limitada
+- [ ] Consulta limitada
 
 Super Administrator
+- [x] Acceso completo
 
-- Acceso completo
+Implementación: el Activity Log exige `users.read` y su ruta es admin-only (`ADMIN_ONLY_ROUTES` en `lib/routes.ts`), de modo que Client e Intermediary jamás acceden (UI y URL directa). Nota de arquitectura: el RBAC del proyecto (Historia 6.18/PRD) otorga a Developer el comodín `*` y no incluye `users.*` en Administrator — por tanto Developer mantiene acceso completo de diagnóstico y Administrator no consulta el log global; alinear la matriz exacta de esta historia exigiría cambiar la jerarquía global de permisos (decisión de producto pendiente).
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7824,21 +7929,23 @@ Integración
 
 Integrar con
 
-- Usuarios
-- Clientes
-- Intermediarios
-- Proyectos
-- Hitos
-- Tareas
-- Comentarios
-- Archivos
-- Reportes
-- Notificaciones
-- Configuración
+- [x] Usuarios
+- [x] Clientes
+- [x] Intermediarios
+- [x] Proyectos
+- [x] Hitos
+- [x] Tareas
+- [x] Comentarios
+- [x] Archivos
+- [x] Reportes
+- [x] Notificaciones
+- [x] Configuración
+
+Implementación: todos los módulos escriben sus eventos en `activity_logs` vía `ActivityService.log` (usuarios/roles/permisos, clientes, intermediarios, proyectos, hitos, tareas — 16.4, comentarios, archivos, reportes con `exported_report`, notificaciones con lectura/descarte/preferencias — 13.13, y configuración con diffs). El log global expone búsqueda, filtros, timeline, exportación (16.11) y clasificación de seguridad (16.13).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7872,7 +7979,7 @@ P2
 
 Estado
 
-Backlog
+In Progress
 
 Dependencias
 
@@ -7890,22 +7997,24 @@ Diseñar una API segura para permitir futuras integraciones.
 
 ### Backend
 
-- [ ] Arquitectura REST
-- [ ] Versionado de API
-- [ ] Documentación OpenAPI
-- [ ] Paginación
+- [x] Arquitectura REST
+- [x] Versionado de API
+- [x] Documentación OpenAPI
+- [x] Paginación
 - [x] Filtros
-- [ ] Rate Limiting
+- [x] Rate Limiting
 
 ### QA
 
-- [ ] Seguridad
+- [x] Seguridad
 - [ ] Rendimiento
-- [ ] Versionado
+- [x] Versionado
+
+Implementación: `/api/v1/*` — GET de projects, project detail (con tareas/hitos), tasks, clients y milestones (project requerido), read-only, con autenticación Bearer por API key (17.2), limitación de 60 req/min por key, envolvente `{data, pagination, version:"v1"}` y documentación OpenAPI 3.1 en `/api/v1/openapi` importable por Swagger/Postman. La visibilidad de datos replica la del propietario de la key (actor context asíncrono sobre auth-scope). Pendiente: pruebas de carga/rendimiento.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -7919,15 +8028,17 @@ Autenticación de API
 
 Implementar
 
-- [ ] API Keys
-- [ ] Tokens de acceso
-- [ ] Expiración
-- [ ] Revocación
-- [ ] Rotación de credenciales
+- [x] API Keys
+- [x] Tokens de acceso
+- [x] Expiración
+- [x] Revocación
+- [x] Rotación de credenciales
+
+Implementación: tabla `api_keys` (hash SHA-256, prefijo visible, scopes read/write, expiración a 12 meses, `revoked_at`, `last_used_at`); UI de gestión en `/dashboard/integrations` (crear con secret mostrado una sola vez, revocar, eliminar, uso auditado `created_api_key`/`revoked_api_key`/`used_api_key`). Rotación operativa: crear una key nueva y revocar la anterior sin interrumpir el servicio.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7941,25 +8052,27 @@ Webhooks
 
 Permitir enviar eventos cuando ocurra.
 
-- Proyecto creado
-- Proyecto actualizado
-- Proyecto finalizado
-- Nueva tarea
-- Cambio de estado
-- Nuevo comentario
-- Archivo subido
-- Nuevo cliente
+- [x] Proyecto creado
+- [x] Proyecto actualizado
+- [x] Proyecto finalizado
+- [x] Nueva tarea
+- [x] Cambio de estado
+- [x] Nuevo comentario
+- [x] Archivo subido
+- [x] Nuevo cliente
 
 Configuración
 
-- [ ] URL destino
-- [ ] Reintentos
-- [ ] Firma de seguridad
-- [ ] Historial de entregas
+- [x] URL destino
+- [x] Reintentos
+- [x] Firma de seguridad
+- [x] Historial de entregas
+
+Implementación: tabla `webhooks` + `webhook_deliveries` (cola de reintentos con intentos acotados, timeout de 8s); cada entrega viaja firmada con HMAC-SHA256 (`x-admipy-signature`) y cabecera de evento. El dispatcher corre tras la respuesta HTTP (`after`) alimentado por el bus de eventos (17.7) — project.*, task.*, comment.created, file.uploaded, milestone.completed y client.created. UI en `/dashboard/integrations`: alta (secret mostrado una vez), pausa/activación, "Retry pending" e historial de entregas con estado HTTP/error.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -7973,18 +8086,20 @@ Integración con Calendarios
 
 Preparar integración con
 
-- Google Calendar
-- Microsoft Outlook
+- [x] Google Calendar
+- [x] Microsoft Outlook
 
 Funciones
 
-- [ ] Sincronizar hitos
-- [ ] Sincronizar entregas
-- [ ] Sincronizar recordatorios
+- [x] Sincronizar hitos
+- [x] Sincronizar entregas
+- [x] Sincronizar recordatorios
+
+Implementación: feed iCalendar en `/api/v1/calendar` (autenticación por API key) con VEVENTs de hitos próximos (50) y tareas con fecha límite no completadas, fechas VALUE=DATE y UIDs estables — importable en Google Calendar ("From URL") y Outlook ("Subscribe from web"). La sincronización es de solo lectura (pull del calendario externo); la bidireccional queda en el roadmap v2 (docs/ROADMAP.md).
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -8016,6 +8131,8 @@ Prioridad
 
 P2
 
+Implementación (preparación): el patrón de transporte estándarizado por `EmailService` (interfaz de canal con frecuencia/horas silenciosas) y el bus de eventos (17.7) permite registrar canales Slack/Teams/Discord sin tocar los call sites; los adaptadores concretos quedan para cuando se seleccione proveedor (docs/ROADMAP.md, v4).
+
 ---
 
 # Historia 17.6
@@ -8038,9 +8155,11 @@ Registrar actividad.
 Si cambia un estado →
 Actualizar indicadores.
 
+Implementación: tabla `automation_rules` + `AutomationsService.executeForEvent`: cada regla asocia un evento interno (project.*, task.*, comment.created, file.uploaded, milestone.completed) a una acción — `notify_project_audience` (notificación in-app a la audiencia del proyecto, con dedupe por regla/evento/día) o `webhook_forward`. UI de alta/pausa/borrado en `/dashboard/integrations` con auditoría por cambio; la ejecución se dispara desde el bus (17.7) después de la respuesta.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -8056,14 +8175,16 @@ Implementar un sistema de eventos internos.
 
 Funciones
 
-- [ ] Publicación de eventos
-- [ ] Suscripción
-- [ ] Procesamiento asíncrono
-- [ ] Reintentos
+- [x] Publicación de eventos
+- [x] Suscripción
+- [x] Procesamiento asíncrono
+- [x] Reintentos
+
+Implementación: `lib/events/bus.ts` — `publish` persiste cada evento en `system_events` (log durable) y programa los side-channels con `after()` de next/server (webhooks con cola de reintentos acotados + reglas de automatización + suscriptores in-process registrables vía `subscribe`). Los triggers de notificaciones publican los eventos de la plataforma, de modo que un solo call site alimenta notificaciones, webhooks y automatizaciones; los fallos de un canal nunca bloquean la mutación principal.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -8083,9 +8204,11 @@ Preparar la plataforma para soportar.
 
 Sin implementarlos inicialmente.
 
+Implementación (preparación): puntos de extensión ya disponibles y documentados (docs/ROADMAP.md): suscripción al bus de eventos (`subscribe`) para reaccionar a la actividad, entrega vía webhooks firmados para extensiones externas, widgets de dashboard componibles (librería `components/dashboard` alimentada por servicios batcheados — el patrón que un plugin replicaría) y catálogos de ajustes extensibles. El registro formal de plugins queda para la v4.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -8106,6 +8229,8 @@ Preparar arquitectura para futuras funciones como.
 - Estimaciones automáticas
 - Clasificación de tareas
 
+Implementación (preparación): las entradas naturales para un servicio de IA ya existen — `system_events` como flujo de actividad normalizado, `ModuleReport` como representación estandar de datos de negocio (KPIs + tablas) reutilizable para resúmenes y generación de reportes, y `buildMilestoneIndicators`/`assessAtRiskProject` como funciones puras de análisis de riesgo listas para ser ampliadas. Los planes de integración están en docs/ROADMAP.md (v3).
+
 Estado
 
 Backlog
@@ -8122,20 +8247,22 @@ Importación de Datos
 
 Permitir importar
 
-- Clientes
-- Proyectos
-- Usuarios
-- Tareas
-- Hitos
+- [x] Clientes
+- [x] Proyectos
+- [ ] Usuarios
+- [ ] Tareas
+- [ ] Hitos
 
 Formatos
 
-- CSV
-- Excel
+- [x] CSV
+- [ ] Excel
+
+Implementación: `/dashboard/import` con flujo de dos fases — "Validate" (parser CSV RFC-4180 propio, mapeo de cabeceras por alias, validación Zod por fila y reporte detallado sin escribir) y "Import" que inserta únicamente las filas válidas (clientes, y proyectos que resuelven su cliente por email/empresa vía `findByEmailOrCompany`; ambos con auditoría `imported_data` y publicación del evento interno). Tareas/hitos/usuarios y el formato Excel reutilizan el mismo pipeline cuando se sumen; los tipos de fila y el resolver de proyecto ya están aislados por entidad.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -8149,22 +8276,24 @@ Exportación Global
 
 Permitir exportar
 
-- Base de proyectos
-- Clientes
-- Reportes
-- Auditoría
-- Configuración
+- [x] Base de proyectos
+- [x] Clientes
+- [x] Reportes
+- [x] Auditoría
+- [x] Configuración
 
 Formatos
 
-- ZIP
-- CSV
-- Excel
-- PDF
+- [x] ZIP
+- [x] CSV
+- [x] Excel
+- [x] PDF
+
+Implementación: `GET /api/export/global` (roles de acceso completo + `reports.export`) genera un ZIP con CSVs de clientes, proyectos, tareas, hitos, Activity Log (hasta 5000 eventos), configuración y un README con contexto; auditado como `exported_globals`. Los reportes por módulo ya exportan PDF/CSV/Excel desde el centro de Reportes (Épica 12) y el dashboard (11.13), cubriendo los formatos por superficie.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -8178,17 +8307,19 @@ Monitoreo
 
 Registrar
 
-- Rendimiento
-- Errores
-- Latencia
-- Uso de recursos
-- Disponibilidad
+- [x] Rendimiento
+- [x] Errores
+- [ ] Latencia
+- [ ] Uso de recursos
+- [x] Disponibilidad
 
 Preparado para futuras herramientas de observabilidad.
 
+Implementación: `/api/health` expone estado (ok/degraded), verificación de base de datos con latencia de la consulta en ms y versión — apto para uptime monitors y balanceadores. Los errores de integración y ejecución quedan en el Activity Log/consola estructurada del servidor. Pendiente: métricas agregadas de latencia por endpoint y uso de recursos (instrumentación OTel/Sentry, planificado en docs/ROADMAP.md).
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -8208,9 +8339,11 @@ Preparar la arquitectura para
 - Procesamiento asíncrono
 - Colas de trabajo
 
+Implementación (preparación, docs/ROADMAP.md): autorización centralizada en `lib/auth-scope.ts` (un filtro `tenant_id` sería un cambio local), `withActor` para ejecutar consultas como cualquier actor (base del aislamiento por tenant), eventos persistentes (`system_events`) y entregas en cola (`webhook_deliveries`) ejecutadas con `after()` — migrables a colas externas (SQS/Cloudflare Queues) sin cambiar call sites — y consultas agregadas batcheadas sin N+1, envolvente natural para cache distribuido por tenant.
+
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -8242,9 +8375,11 @@ Versión 4
 - Plugins
 - Integraciones premium
 
+Implementación: `docs/ROADMAP.md` documenta el roadmap v2 (Gantt sobre las tablas de dependencias existentes, dependencias avanzadas, automatizaciones visuales, webhooks administrados), v3 (app nativa sobre la API v1, endpoints de escritura/OAuth, funciones de IA sobre system_events/ModuleReport), v4 (marketplace sobre `templates`, plugins sobre el bus de eventos, canales Slack/Teams/Discord) y la preparación multi-tenant.
+
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -8258,27 +8393,29 @@ Permisos
 
 Developer
 
-- Uso de integraciones autorizadas
+- [x] Uso de integraciones autorizadas
 
 Intermediary
 
-- Sin acceso administrativo
+- [x] Sin acceso administrativo
 
 Client
 
-- Sin acceso administrativo
+- [x] Sin acceso administrativo
 
 Administrator
 
-- Configuración parcial
+- [ ] Configuración parcial
 
 Super Administrator
 
-- Gestión completa
+- [x] Gestión completa
+
+Implementación: `/dashboard/integrations` y `/dashboard/import` son rutas admin-only (`lib/routes.ts`) y todas las mutaciones exigen `requirePermission("settings.update")` — de acuerdo con la jerarquía de permisos (6.18), Developer y Super Administrator gestionan; Intermediary/Client no acceden. Nota: Administrator no posee `settings.*` en la jerarquía actual, por lo que la "configuración parcial" de esta historia requeriría añadirle un permiso dedicado (decisión de producto pendiente).
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -8292,15 +8429,17 @@ Auditoría
 
 Registrar
 
-- Uso de API
-- Creación de API Keys
-- Webhooks enviados
-- Automatizaciones ejecutadas
-- Errores de integración
+- [x] Uso de API
+- [x] Creación de API Keys
+- [x] Webhooks enviados
+- [ ] Automatizaciones ejecutadas
+- [x] Errores de integración
+
+Implementación: `used_api` (por endpoint, con dedupe por ventana), `created_api_key`/`revoked_api_key`/`deleted_api_key`, `created_webhook`/`activated_webhook`/`deactivated_webhook`/`deleted_webhook`, y los errores de entrega quedan persistidos en `webhook_deliveries` (estado HTTP, intentos, error) con visibilidad en la UI de Integraciones. Las entregas por webhook se auditan a través de su historial propio; la auditoría por ejecución de automatización (evento por run) queda pendiente para no duplicar el registro de la notificación resultante.
 
 Estado
 
-Backlog
+In Progress
 
 Prioridad
 
@@ -8314,16 +8453,18 @@ Integración
 
 Integrar con
 
-- Todos los módulos existentes
-- API Pública
-- Webhooks
-- Auditoría
-- Configuración
-- Notificaciones
+- [x] Todos los módulos existentes
+- [x] API Pública
+- [x] Webhooks
+- [x] Auditoría
+- [x] Configuración
+- [x] Notificaciones
+
+Implementación: el bus interno (17.7) recibe los eventos publicados por los triggers de todos los módulos (proyectos, tareas, hitos, comentarios, archivos, clientes) y los distribuye a la API pública (vía keys), webhooks (firmados), automatizaciones y auditoría; la configuración de canales vive en Ajustes/Integraciones (API keys, webhooks, reglas, PWA) y las notificaciones in-app/email se alimentan de los mismos eventos.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
