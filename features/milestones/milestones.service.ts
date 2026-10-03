@@ -301,7 +301,7 @@ export class MilestonesService {
    * Shared by the role dashboards (Historias 8.10/8.11/11.2/11.3) through the
    * project scope fragment, so authorization stays at the data layer.
    */
-  static async getUpcomingForScope(limit = 6): Promise<UpcomingMilestone[]> {
+  static async getUpcomingForScope(limit = 6, projectId?: string): Promise<UpcomingMilestone[]> {
     const scope = await projectScope("p.id");
 
     return query<UpcomingMilestone>(
@@ -314,9 +314,10 @@ export class MilestonesService {
          AND p.deleted_at IS NULL AND c.deleted_at IS NULL AND c.is_active = 1
          AND m.status NOT IN ('Completed', 'Cancelled')
          AND m.estimated_date IS NOT NULL${scope.sql ? ` AND ${scope.sql}` : ""}
+         ${projectId ? "AND m.project_id = ?" : ""}
        ORDER BY m.estimated_date ASC
        LIMIT ?`,
-      [...scope.args, limit],
+      projectId ? [...scope.args, projectId, limit] : [...scope.args, limit],
     );
   }
 

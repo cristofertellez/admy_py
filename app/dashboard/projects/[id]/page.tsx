@@ -19,6 +19,7 @@ import { ReportExportButtons } from "./report-export-buttons";
 import { Card, CardContent } from "@/components/shared/card";
 import { Badge } from "@/components/shared/badge";
 import { TagChip } from "@/components/shared/tag-chip";
+import { TrackRecentView } from "@/components/pwa/track-recent-view";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -124,6 +125,7 @@ export default async function ProjectDetailPage({ params, searchParams }: Props)
 
   return (
     <div className="space-y-6">
+      <TrackRecentView type="project" id={id} title={project.name as string} />
       <div className="flex items-center justify-between">
         <div>
           <Link href="/dashboard/projects" className="text-body-sm text-muted hover:text-body-strong">← Back to Projects</Link>

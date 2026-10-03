@@ -27,6 +27,15 @@ function getServerSnapshot(): PendingAction[] {
   return EMPTY_ACTIONS;
 }
 
+// Historia 14.14 — reconnection and synchronization results are audited.
+function reportPwaEvent(type: string, detail?: Record<string, unknown>): void {
+  void fetch("/api/pwa/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, detail }),
+  }).catch(() => undefined);
+}
+
 interface UseOfflineQueueResult {
   actions: PendingAction[];
   count: number;
@@ -59,6 +68,10 @@ export function useOfflineQueue(): UseOfflineQueueResult {
       const result = await flushPendingActions();
       if (result.synced > 0) {
         queryClient.invalidateQueries();
+        reportPwaEvent("sync_completed", { synced: result.synced });
+      }
+      if (result.failed > 0) {
+        reportPwaEvent("offline_error", { failed: result.failed });
       }
     } finally {
       setIsFlushing(false);

@@ -16,6 +16,7 @@ import type { ClientDashboardData, ClientDashboardProject } from "@/features/das
 
 interface ClientPanelProps {
   data: ClientDashboardData;
+  widgets: { id: string; label: string }[];
 }
 
 const DUE_SOON_WINDOW_DAYS = 30;
@@ -61,8 +62,55 @@ function ProjectRow({ project }: { project: ClientDashboardProject }) {
   );
 }
 
-export function ClientPanel({ data }: ClientPanelProps) {
+export function ClientPanel({ data, widgets }: ClientPanelProps) {
   const { stats } = data;
+
+  const widgetById: Record<string, React.ReactNode> = {
+    myProjects: (
+      <ListCard
+        key="myProjects"
+        title="My Projects"
+        badge={String(data.projects.length)}
+        emptyMessage="No active projects right now."
+        itemCount={data.projects.length}
+      >
+        {data.projects.map((project) => (
+          <ProjectRow key={project.id} project={project} />
+        ))}
+      </ListCard>
+    ),
+    upcomingMilestones: (
+      <MilestonesCard
+        key="upcomingMilestones"
+        milestones={data.upcomingMilestones}
+        title="Upcoming Milestones"
+        emptyMessage="No upcoming milestones on your projects."
+      />
+    ),
+    upcomingDeliveries: (
+      <div key="upcomingDeliveries" className="lg:col-span-2">
+        <DueSoonCard
+          projects={data.dueSoonProjects}
+          title="Upcoming Deliveries"
+          emptyMessage={`No deliveries scheduled within ${DUE_SOON_WINDOW_DAYS} days.`}
+        />
+      </div>
+    ),
+    recentComments: (
+      <CommentsCard
+        key="recentComments"
+        comments={data.recentComments}
+        emptyMessage="No recent comments on your projects."
+      />
+    ),
+    recentFiles: (
+      <FilesCard
+        key="recentFiles"
+        files={data.recentFiles}
+        emptyMessage="No files shared on your projects yet."
+      />
+    ),
+  };
 
   return (
     <div className="space-y-6">
@@ -74,36 +122,7 @@ export function ClientPanel({ data }: ClientPanelProps) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <ListCard
-          title="My Projects"
-          badge={String(data.projects.length)}
-          emptyMessage="No active projects right now."
-          itemCount={data.projects.length}
-        >
-          {data.projects.map((project) => (
-            <ProjectRow key={project.id} project={project} />
-          ))}
-        </ListCard>
-
-        <MilestonesCard
-          milestones={data.upcomingMilestones}
-          title="Upcoming Milestones"
-          emptyMessage="No upcoming milestones on your projects."
-        />
-      </div>
-
-      <DueSoonCard
-        projects={data.dueSoonProjects}
-        title="Upcoming Deliveries"
-        emptyMessage={`No deliveries scheduled within ${DUE_SOON_WINDOW_DAYS} days.`}
-      />
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <CommentsCard
-          comments={data.recentComments}
-          emptyMessage="No recent comments on your projects."
-        />
-        <FilesCard files={data.recentFiles} emptyMessage="No files shared on your projects yet." />
+        {widgets.map((widget) => widgetById[widget.id] ?? null)}
       </div>
     </div>
   );

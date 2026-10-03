@@ -76,6 +76,12 @@ export function InstallPrompt() {
     const { outcome } = await installEvent.userChoice;
     if (outcome === "accepted") {
       localStorage.setItem(DISMISS_KEY, "1");
+      // Historia 14.14 — installations are audited.
+      void fetch("/api/pwa/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "installed" }),
+      }).catch(() => undefined);
     }
     setInstallEvent(null);
     setVariant(null);

@@ -51,8 +51,10 @@ export type SettingCategoryId =
   | "milestones"
   | "notifications"
   | "catalogs"
+  | "audit"
   | "security"
-  | "personalization";
+  | "personalization"
+  | "pwa";
 
 export interface SettingCategory {
   id: SettingCategoryId;
@@ -425,6 +427,50 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
         defaultValue: 15,
         min: 1,
         max: 1440,
+      },
+    ],
+  },
+  {
+    id: "audit",
+    label: "Audit",
+    description: "Activity log retention (Historia 16.12).",
+    settings: [
+      {
+        key: "audit_retention_days",
+        label: "Retention (days)",
+        type: "number",
+        description: "Delete activity logs older than this many days. 0 keeps everything.",
+        defaultValue: 0,
+        min: 0,
+        max: 3650,
+      },
+    ],
+  },
+  {
+    id: "pwa",
+    label: "Progressive Web App",
+    description: "Offline and installation behavior (Historia 14.13).",
+    settings: [
+      {
+        key: "pwa_auto_updates",
+        label: "Automatic updates",
+        type: "boolean",
+        description: "Install new app versions automatically when available.",
+        defaultValue: true,
+      },
+      {
+        key: "pwa_offline_cache",
+        label: "Offline cache",
+        type: "boolean",
+        description: "Cache visited pages for read-only access without connection.",
+        defaultValue: true,
+      },
+      {
+        key: "pwa_background_sync",
+        label: "Background sync",
+        type: "boolean",
+        description: "Synchronize queued changes automatically when back online.",
+        defaultValue: true,
       },
     ],
   },

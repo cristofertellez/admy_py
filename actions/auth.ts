@@ -35,6 +35,18 @@ export async function login(_prevState: unknown, formData: FormData) {
     });
   } catch (error) {
     if (error instanceof AuthError) {
+      // Historia 16.13 — failed sign-in attempts are registered as security
+      // events (email only; credentials are never logged).
+      const knownUser = await queryOne<{ id: string }>(
+        "SELECT id FROM users WHERE email = ? LIMIT 1",
+        [parsed.data.email.toLowerCase()],
+      );
+      await ActivityService.log({
+        user_id: knownUser?.id ?? "00000000-0000-0000-0000-000000000000",
+        action: "login_failed",
+        entity: "User",
+        new_value: { email: parsed.data.email.toLowerCase() },
+      }).catch(() => undefined);
       return { error: "Invalid email or password." };
     }
     throw error;

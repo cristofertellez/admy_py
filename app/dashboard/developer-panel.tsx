@@ -10,15 +10,16 @@ import {
 } from "@/components/dashboard";
 import type { DeveloperDashboardData } from "@/features/dashboard";
 
-// Historia 11.2 — Dashboard del Developer: the most complete panel of the
-// platform. Every KPI links to its module and every widget is a shared,
-// reusable component fed by a single batched service call.
+// Historia 11.2 / 11.11 — Dashboard del Developer: the most complete panel of
+// the platform. Widgets render in the user's saved order (personalizable);
+// the KPI row always stays visible.
 
 interface DeveloperPanelProps {
   data: DeveloperDashboardData;
+  widgets: { id: string; label: string }[];
 }
 
-export function DeveloperPanel({ data }: DeveloperPanelProps) {
+export function DeveloperPanel({ data, widgets }: DeveloperPanelProps) {
   const { stats } = data;
 
   const taskData = [
@@ -38,6 +39,37 @@ export function DeveloperPanel({ data }: DeveloperPanelProps) {
     { label: "Worked", value: Math.round(stats.totalWorkedHours), color: "#10B981" },
   ];
 
+  const widgetById: Record<string, React.ReactNode> = {
+    taskStatusChart: (
+      <Card key="taskStatusChart">
+        <CardHeader><CardTitle>Tasks by Status</CardTitle></CardHeader>
+        <CardContent><BarChart data={taskData} /></CardContent>
+      </Card>
+    ),
+    projectStatusChart: (
+      <Card key="projectStatusChart">
+        <CardHeader><CardTitle>Projects by Status</CardTitle></CardHeader>
+        <CardContent><BarChart data={projectData} /></CardContent>
+      </Card>
+    ),
+    hoursChart: (
+      <Card key="hoursChart">
+        <CardHeader><CardTitle>Hours — Estimated vs Worked</CardTitle></CardHeader>
+        <CardContent>
+          <BarChart data={hoursData} />
+          <p className="mt-3 text-caption text-muted">
+            Average project progress: {Math.round(stats.averageProgress)}%
+          </p>
+        </CardContent>
+      </Card>
+    ),
+    upcomingMilestones: <MilestonesCard key="upcomingMilestones" milestones={data.upcomingMilestones} />,
+    atRiskProjects: <AtRiskProjectsCard key="atRiskProjects" projects={data.atRiskProjects} />,
+    recentActivity: <ActivityCard key="recentActivity" logs={data.recentActivity} />,
+    recentComments: <CommentsCard key="recentComments" comments={data.recentComments} />,
+    recentFiles: <FilesCard key="recentFiles" files={data.recentFiles} />,
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -52,34 +84,7 @@ export function DeveloperPanel({ data }: DeveloperPanelProps) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader><CardTitle>Tasks by Status</CardTitle></CardHeader>
-          <CardContent><BarChart data={taskData} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Projects by Status</CardTitle></CardHeader>
-          <CardContent><BarChart data={projectData} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Hours — Estimated vs Worked</CardTitle></CardHeader>
-          <CardContent>
-            <BarChart data={hoursData} />
-            <p className="mt-3 text-caption text-muted">
-              Average project progress: {Math.round(stats.averageProgress)}%
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <MilestonesCard milestones={data.upcomingMilestones} />
-        <AtRiskProjectsCard projects={data.atRiskProjects} />
-        <ActivityCard logs={data.recentActivity} />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <CommentsCard comments={data.recentComments} />
-        <FilesCard files={data.recentFiles} />
+        {widgets.map((widget) => widgetById[widget.id] ?? null)}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { getUser } from "@/lib/auth";
+import { SettingsService } from "@/features/settings";
 import "./globals.css";
 
 const inter = Inter({
@@ -55,7 +56,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const user = await getUser();
+  const [user, autoUpdatesRaw] = await Promise.all([
+    getUser(),
+    // Historia 14.13 — PWA settings drive the update behavior (14.9).
+    SettingsService.getValue("pwa_auto_updates").catch(() => null),
+  ]);
+  const autoUpdates = autoUpdatesRaw !== false;
 
   return (
     <html
@@ -65,7 +71,7 @@ export default async function RootLayout({
     >
       <body className="min-h-screen bg-canvas text-body antialiased">
         <Providers>{children}</Providers>
-        <ServiceWorkerRegister />
+        <ServiceWorkerRegister autoUpdate={autoUpdates} />
       </body>
     </html>
   );

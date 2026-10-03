@@ -1,9 +1,68 @@
-import { countRows, query } from "@/lib/turso/client";
+import { countRows, query, type InValue } from "@/lib/turso/client";
 import { clientScope, projectScope, requireScopedUser } from "@/lib/auth-scope";
 import type { SessionProfile } from "@/lib/auth";
 import { hasFullAccess } from "@/lib/roles";
 import { ActivityLogService, type ActivityLog } from "@/features/activity";
 import { MilestonesService, type UpcomingMilestone } from "@/features/milestones";
+
+// Historia 11.12 — global dashboard filters. All values are optional and
+// validated against option lists in the page before reaching the service.
+export interface DashboardFilters {
+  projectId?: string;
+  clientId?: string;
+  status?: string;
+  priority?: string;
+  from?: string;
+  to?: string;
+}
+
+function projectFilterFragment(filters: DashboardFilters, alias = "p"): { sql: string; args: InValue[] } {
+  const parts: string[] = [];
+  const args: InValue[] = [];
+  if (filters.projectId) {
+    parts.push(`${alias}.id = ?`);
+    args.push(filters.projectId);
+  }
+  if (filters.clientId) {
+    parts.push(`${alias}.client_id = ?`);
+    args.push(filters.clientId);
+  }
+  if (filters.status) {
+    parts.push(`${alias}.status = ?`);
+    args.push(filters.status);
+  }
+  if (filters.from) {
+    parts.push(`${alias}.estimated_start_date >= ?`);
+    args.push(filters.from);
+  }
+  if (filters.to) {
+    parts.push(`${alias}.estimated_end_date <= ?`);
+    args.push(filters.to);
+  }
+  return { sql: parts.join(" AND "), args };
+}
+
+function taskFilterFragment(filters: DashboardFilters, alias = "t"): { sql: string; args: InValue[] } {
+  const parts: string[] = [];
+  const args: InValue[] = [];
+  if (filters.projectId) {
+    parts.push(`${alias}.project_id = ?`);
+    args.push(filters.projectId);
+  }
+  if (filters.priority) {
+    parts.push(`${alias}.priority = ?`);
+    args.push(filters.priority);
+  }
+  if (filters.from) {
+    parts.push(`${alias}.estimated_end >= ?`);
+    args.push(filters.from);
+  }
+  if (filters.to) {
+    parts.push(`${alias}.estimated_end <= ?`);
+    args.push(filters.to);
+  }
+  return { sql: parts.join(" AND "), args };
+}
 
 export interface DashboardStats {
   totalClients: number;
@@ -226,21 +285,23 @@ export function assessAtRiskProject(row: AtRiskRow): DashboardAtRiskProject | nu
 }
 
 export class DashboardService {
-  static async getStats(user?: SessionProfile): Promise<DashboardStats> {
+  static async getStats(user?: SessionProfile, filters: DashboardFilters = {}): Promise<DashboardStats> {
     const actor = user ?? (await requireScopedUser());
 
     if (hasFullAccess(actor.role)) {
-      return DashboardService.getDeveloperStats();
+      return DashboardService.getDeveloperStats(filters);
     }
 
-    return DashboardService.getScopedStats();
+    return DashboardService.getScopedStats(filters);
   }
 
-  private static async getScopedStats(): Promise<DashboardStats> {
+  private static async getScopedStats(filters: DashboardFilters = {}): Promise<DashboardStats> {
     const clientClause = await clientScope("id");
     const projectClause = await projectScope("p.id");
     const taskClause = await projectScope("t.project_id");
     const today = new Date().toISOString().slice(0, 10);
+    const projectFilter = projectFilterFragment(filters);
+    const taskFilter = taskFilterFragment(filters);
 
     const [
       totalClients,
@@ -263,49 +324,55 @@ export class DashboardService {
         clientClause.args,
       ),
       countRows(
-        `SELECT COUNT(*) AS total FROM projects p WHERE p.deleted_at IS NULL AND ${projectClause.sql}`,
-        projectClause.args,
+        `SELECT COUNT(*) AS total FROM projects p WHERE p.deleted_at IS NULL
+           AND ${projectClause.sql}${projectFilter.sql ? ` AND (${projectFilter.sql})` : ""}`,
+        [...projectClause.args, ...projectFilter.args],
       ),
       countRows(
         `SELECT COUNT(*) AS total FROM projects p
          WHERE p.deleted_at IS NULL AND p.is_active = 1 AND p.status NOT IN ('Completed', 'Cancelled', 'Archived')
-           AND ${projectClause.sql}`,
-        projectClause.args,
+           AND ${projectClause.sql}${projectFilter.sql ? ` AND (${projectFilter.sql})` : ""}`,
+        [...projectClause.args, ...projectFilter.args],
       ),
       countRows(
-        `SELECT COUNT(*) AS total FROM projects p WHERE p.deleted_at IS NULL AND p.status = 'Completed' AND ${projectClause.sql}`,
-        projectClause.args,
+        `SELECT COUNT(*) AS total FROM projects p WHERE p.deleted_at IS NULL AND p.status = 'Completed'
+           AND ${projectClause.sql}${projectFilter.sql ? ` AND (${projectFilter.sql})` : ""}`,
+        [...projectClause.args, ...projectFilter.args],
       ),
       countRows(
         `SELECT COUNT(*) AS total FROM projects p
          WHERE p.deleted_at IS NULL AND p.is_active = 1 AND p.status NOT IN ('Completed', 'Cancelled', 'Archived')
            AND p.estimated_end_date IS NOT NULL AND p.estimated_end_date < ?
-           AND ${projectClause.sql}`,
-        [today, ...projectClause.args],
+           AND ${projectClause.sql}${projectFilter.sql ? ` AND (${projectFilter.sql})` : ""}`,
+        [today, ...projectClause.args, ...projectFilter.args],
       ),
       countRows(
-        `SELECT COUNT(*) AS total FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'Pending' AND ${taskClause.sql}`,
-        taskClause.args,
+        `SELECT COUNT(*) AS total FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'Pending'
+           AND ${taskClause.sql}${taskFilter.sql ? ` AND (${taskFilter.sql})` : ""}`,
+        [...taskClause.args, ...taskFilter.args],
       ),
       countRows(
-        `SELECT COUNT(*) AS total FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'In Progress' AND ${taskClause.sql}`,
-        taskClause.args,
+        `SELECT COUNT(*) AS total FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'In Progress'
+           AND ${taskClause.sql}${taskFilter.sql ? ` AND (${taskFilter.sql})` : ""}`,
+        [...taskClause.args, ...taskFilter.args],
       ),
       countRows(
-        `SELECT COUNT(*) AS total FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'Blocked' AND ${taskClause.sql}`,
-        taskClause.args,
+        `SELECT COUNT(*) AS total FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'Blocked'
+           AND ${taskClause.sql}${taskFilter.sql ? ` AND (${taskFilter.sql})` : ""}`,
+        [...taskClause.args, ...taskFilter.args],
       ),
       countRows(
-        `SELECT COUNT(*) AS total FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'Completed' AND ${taskClause.sql}`,
-        taskClause.args,
+        `SELECT COUNT(*) AS total FROM tasks t WHERE t.deleted_at IS NULL AND t.status = 'Completed'
+           AND ${taskClause.sql}${taskFilter.sql ? ` AND (${taskFilter.sql})` : ""}`,
+        [...taskClause.args, ...taskFilter.args],
       ),
     ]);
 
     const hours = await query<ProjectHoursRow>(
       `SELECT p.estimated_hours, p.worked_hours, p.completion_percentage
        FROM projects p
-       WHERE p.deleted_at IS NULL AND ${projectClause.sql}`,
-      projectClause.args,
+       WHERE p.deleted_at IS NULL AND ${projectClause.sql}${projectFilter.sql ? ` AND (${projectFilter.sql})` : ""}`,
+      [...projectClause.args, ...projectFilter.args],
     );
 
     return DashboardService.buildStats({
@@ -323,8 +390,10 @@ export class DashboardService {
     });
   }
 
-  static async getDeveloperStats(): Promise<DashboardStats> {
+  static async getDeveloperStats(filters: DashboardFilters = {}): Promise<DashboardStats> {
     const today = new Date().toISOString().slice(0, 10);
+    const projectsFilter = projectFilterFragment(filters, "projects");
+    const tasksFilter = taskFilterFragment(filters, "tasks");
 
     const [
       totalClients,
@@ -340,26 +409,54 @@ export class DashboardService {
     ] = await Promise.all([
       countRows(`SELECT COUNT(*) AS total FROM clients WHERE deleted_at IS NULL`),
       countRows(`SELECT COUNT(*) AS total FROM clients WHERE deleted_at IS NULL AND is_active = 1`),
-      countRows(`SELECT COUNT(*) AS total FROM projects WHERE deleted_at IS NULL`),
       countRows(
-        `SELECT COUNT(*) AS total FROM projects
-         WHERE deleted_at IS NULL AND is_active = 1 AND status NOT IN ('Completed', 'Cancelled', 'Archived')`,
+        `SELECT COUNT(*) AS total FROM projects WHERE deleted_at IS NULL${projectsFilter.sql ? ` AND (${projectsFilter.sql})` : ""}`,
+        projectsFilter.args,
       ),
-      countRows(`SELECT COUNT(*) AS total FROM projects WHERE deleted_at IS NULL AND status = 'Completed'`),
       countRows(
         `SELECT COUNT(*) AS total FROM projects
          WHERE deleted_at IS NULL AND is_active = 1 AND status NOT IN ('Completed', 'Cancelled', 'Archived')
-           AND estimated_end_date IS NOT NULL AND estimated_end_date < ?`,
-        [today],
+           ${projectsFilter.sql ? `AND (${projectsFilter.sql})` : ""}`,
+        projectsFilter.args,
       ),
-      countRows(`SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL AND status = 'Pending'`),
-      countRows(`SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL AND status = 'In Progress'`),
-      countRows(`SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL AND status = 'Blocked'`),
-      countRows(`SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL AND status = 'Completed'`),
+      countRows(
+        `SELECT COUNT(*) AS total FROM projects WHERE deleted_at IS NULL AND status = 'Completed'
+           ${projectsFilter.sql ? `AND (${projectsFilter.sql})` : ""}`,
+        projectsFilter.args,
+      ),
+      countRows(
+        `SELECT COUNT(*) AS total FROM projects
+         WHERE deleted_at IS NULL AND is_active = 1 AND status NOT IN ('Completed', 'Cancelled', 'Archived')
+            AND estimated_end_date IS NOT NULL AND estimated_end_date < ?
+            ${projectsFilter.sql ? `AND (${projectsFilter.sql})` : ""}`,
+        [today, ...projectsFilter.args],
+      ),
+      countRows(
+        `SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL AND status = 'Pending'
+           ${tasksFilter.sql ? `AND (${tasksFilter.sql})` : ""}`,
+        tasksFilter.args,
+      ),
+      countRows(
+        `SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL AND status = 'In Progress'
+           ${tasksFilter.sql ? `AND (${tasksFilter.sql})` : ""}`,
+        tasksFilter.args,
+      ),
+      countRows(
+        `SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL AND status = 'Blocked'
+           ${tasksFilter.sql ? `AND (${tasksFilter.sql})` : ""}`,
+        tasksFilter.args,
+      ),
+      countRows(
+        `SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL AND status = 'Completed'
+           ${tasksFilter.sql ? `AND (${tasksFilter.sql})` : ""}`,
+        tasksFilter.args,
+      ),
     ]);
 
     const hours = await query<ProjectHoursRow>(
-      `SELECT estimated_hours, worked_hours, completion_percentage FROM projects WHERE deleted_at IS NULL`,
+      `SELECT estimated_hours, worked_hours, completion_percentage FROM projects
+       WHERE deleted_at IS NULL${projectsFilter.sql ? ` AND (${projectsFilter.sql})` : ""}`,
+      projectsFilter.args,
     );
 
     return DashboardService.buildStats({
@@ -413,11 +510,14 @@ export class DashboardService {
 
   // Recent comments across every visible context (client, project, task and
   // milestone conversations) resolved with one scoped query per table.
-  private static async fetchRecentComments(limit = 6): Promise<RecentCommentItem[]> {
+  private static async fetchRecentComments(limit = 6, filters: DashboardFilters = {}): Promise<RecentCommentItem[]> {
     const projectClause = await projectScope("p.id");
     const taskClause = await projectScope("t.project_id");
     const milestoneClause = await projectScope("m.project_id");
     const clientClause = await clientScope("cc.client_id");
+    const projectFilter = projectFilterFragment(filters, "p");
+    const taskFilter = taskFilterFragment(filters, "t");
+    const milestoneFilter = projectFilterFragment(filters, "m");
 
     const [projectRows, taskRows, milestoneRows, clientRows] = await Promise.all([
       query<Omit<RecentCommentItem, "context_type"> & { context_type: string }>(
@@ -429,9 +529,10 @@ export class DashboardService {
          LEFT JOIN users u ON u.id = pc.user_id
          WHERE pc.deleted_at IS NULL AND pc.is_active = 1 AND p.deleted_at IS NULL
            ${projectClause.sql ? `AND ${projectClause.sql}` : ""}
+           ${projectFilter.sql ? `AND (${projectFilter.sql})` : ""}
          ORDER BY pc.created_at DESC
          LIMIT ?`,
-        [...projectClause.args, limit],
+        [...projectClause.args, ...projectFilter.args, limit],
       ),
       query<Omit<RecentCommentItem, "context_type"> & { context_type: string }>(
         `SELECT tc.id, tc.message, tc.created_at,
@@ -442,9 +543,10 @@ export class DashboardService {
          LEFT JOIN users u ON u.id = tc.user_id
          WHERE tc.deleted_at IS NULL AND tc.is_active = 1 AND t.deleted_at IS NULL
            ${taskClause.sql ? `AND ${taskClause.sql}` : ""}
+           ${taskFilter.sql ? `AND (${taskFilter.sql})` : ""}
          ORDER BY tc.created_at DESC
          LIMIT ?`,
-        [...taskClause.args, limit],
+        [...taskClause.args, ...taskFilter.args, limit],
       ),
       query<Omit<RecentCommentItem, "context_type"> & { context_type: string }>(
         `SELECT mc.id, mc.message, mc.created_at,
@@ -455,9 +557,10 @@ export class DashboardService {
          LEFT JOIN users u ON u.id = mc.user_id
          WHERE mc.deleted_at IS NULL AND mc.is_active = 1 AND m.deleted_at IS NULL
            ${milestoneClause.sql ? `AND ${milestoneClause.sql}` : ""}
+           ${milestoneFilter.sql ? `AND (${milestoneFilter.sql})` : ""}
          ORDER BY mc.created_at DESC
          LIMIT ?`,
-        [...milestoneClause.args, limit],
+        [...milestoneClause.args, ...milestoneFilter.args, limit],
       ),
       query<Omit<RecentCommentItem, "context_type"> & { context_type: string }>(
         `SELECT cc.id, cc.message, cc.created_at,
@@ -469,9 +572,10 @@ export class DashboardService {
          LEFT JOIN users u ON u.id = cc.user_id
          WHERE cc.deleted_at IS NULL AND cc.is_active = 1 AND cl.deleted_at IS NULL
            ${clientClause.sql ? `AND ${clientClause.sql}` : ""}
+           ${filters.clientId ? "AND cc.client_id = ?" : ""}
          ORDER BY cc.created_at DESC
          LIMIT ?`,
-        [...clientClause.args, limit],
+        [...clientClause.args, ...(filters.clientId ? [filters.clientId] : []), limit],
       ),
     ]);
 
@@ -484,25 +588,27 @@ export class DashboardService {
       .slice(0, limit);
   }
 
-  private static async fetchRecentProjectFiles(limit = 5): Promise<RecentFileItem[]> {
+  private static async fetchRecentProjectFiles(limit = 5, filters: DashboardFilters = {}): Promise<RecentFileItem[]> {
     const scope = await projectScope("p.id");
+    const filter = projectFilterFragment(filters, "p");
 
     return query<RecentFileItem>(
       `SELECT a.id, a.filename, a.created_at, p.id AS project_id, p.name AS project_name
        FROM attachments a
        JOIN projects p ON p.id = a.entity_id
        WHERE a.entity_type = 'project' AND a.deleted_at IS NULL AND a.is_active = 1
-         AND p.deleted_at IS NULL${scope.sql ? ` AND ${scope.sql}` : ""}
+         AND p.deleted_at IS NULL${scope.sql ? ` AND ${scope.sql}` : ""}${filter.sql ? ` AND (${filter.sql})` : ""}
        ORDER BY a.created_at DESC
        LIMIT ?`,
-      [...scope.args, limit],
+      [...scope.args, ...filter.args, limit],
     );
   }
 
   // Active projects of the visible portfolio with a delivery date within the
   // next `days` — shared by the client and intermediary panels.
-  private static async fetchDueSoonProjects(limit = 6, days = 30): Promise<DueSoonProject[]> {
+  private static async fetchDueSoonProjects(limit = 6, days = 30, filters: DashboardFilters = {}): Promise<DueSoonProject[]> {
     const scope = await projectScope("p.id");
+    const filter = projectFilterFragment(filters, "p");
     const today = new Date().toISOString().slice(0, 10);
     const limitDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -515,9 +621,10 @@ export class DashboardService {
          AND p.status NOT IN ${FINALIZED_PROJECT_STATUSES}
          AND p.estimated_end_date IS NOT NULL AND p.estimated_end_date >= ? AND p.estimated_end_date <= ?
          ${scope.sql ? `AND ${scope.sql}` : ""}
+         ${filter.sql ? `AND (${filter.sql})` : ""}
        ORDER BY p.estimated_end_date ASC
        LIMIT ?`,
-      [today, limitDate, ...scope.args, limit],
+      [today, limitDate, ...scope.args, ...filter.args, limit],
     );
   }
 
@@ -525,8 +632,10 @@ export class DashboardService {
   // Historia 11.2 — Dashboard del Developer
   // ============================================================
 
-  static async getDeveloperDashboard(): Promise<DeveloperDashboardData> {
+  static async getDeveloperDashboard(filters: DashboardFilters = {}): Promise<DeveloperDashboardData> {
     const today = new Date().toISOString().slice(0, 10);
+    const taskFilter = taskFilterFragment(filters, "tasks");
+    const projectFilter = projectFilterFragment(filters, "p");
 
     const [
       stats,
@@ -539,15 +648,16 @@ export class DashboardService {
       activity,
       activeIntermediaries,
     ] = await Promise.all([
-      DashboardService.getDeveloperStats(),
+      DashboardService.getDeveloperStats(filters),
       countRows(
         `SELECT COUNT(*) AS total FROM tasks
          WHERE deleted_at IS NULL AND is_active = 1
            AND status NOT IN ('Completed', 'Cancelled')
-           AND estimated_end IS NOT NULL AND estimated_end < ?`,
-        [today],
+           AND estimated_end IS NOT NULL AND estimated_end < ?
+           ${taskFilter.sql ? `AND (${taskFilter.sql})` : ""}`,
+        [today, ...taskFilter.args],
       ),
-      MilestonesService.getUpcomingForScope(6),
+      MilestonesService.getUpcomingForScope(6, filters.projectId),
       query<AtRiskRow>(
         `SELECT p.id, p.name, p.status, p.completion_percentage, p.estimated_hours, p.worked_hours,
                 c.company_name AS client_name,
@@ -564,21 +674,24 @@ export class DashboardService {
          LEFT JOIN tasks t ON t.project_id = p.id AND t.deleted_at IS NULL AND t.is_active = 1
          WHERE p.deleted_at IS NULL AND p.is_active = 1
            AND p.status NOT IN ${FINALIZED_PROJECT_STATUSES}
+           ${projectFilter.sql ? `AND (${projectFilter.sql})` : ""}
          GROUP BY p.id
          ORDER BY overdue_milestones DESC, overdue_tasks DESC, blocked_tasks DESC
          LIMIT 24`,
-        [today, today],
+        [today, today, ...projectFilter.args],
       ),
       query<ProjectStatusCount>(
         `SELECT status, COUNT(*) AS total
          FROM projects
          WHERE deleted_at IS NULL AND is_active = 1
+           ${projectFilterFragment(filters, "projects").sql ? `AND (${projectFilterFragment(filters, "projects").sql})` : ""}
          GROUP BY status
          ORDER BY total DESC`,
+        projectFilterFragment(filters, "projects").args,
       ),
-      DashboardService.fetchRecentComments(6),
-      DashboardService.fetchRecentProjectFiles(5),
-      ActivityLogService.list({ pageSize: 8 }),
+      DashboardService.fetchRecentComments(6, filters),
+      DashboardService.fetchRecentProjectFiles(5, filters),
+      ActivityLogService.list({ pageSize: 8, entityId: filters.projectId }),
       countRows(
         `SELECT COUNT(*) AS total FROM users u
          JOIN roles r ON r.id = u.role_id
@@ -608,30 +721,32 @@ export class DashboardService {
   // Historia 11.3 — Dashboard del Cliente
   // ============================================================
 
-  static async getClientDashboard(actor: SessionProfile): Promise<ClientDashboardData> {
+  static async getClientDashboard(actor: SessionProfile, filters: DashboardFilters = {}): Promise<ClientDashboardData> {
     if (actor.role !== "Client") {
       throw new Error("Only clients can access this panel.");
     }
 
     const scope = await projectScope("p.id");
+    const projectFilter = projectFilterFragment(filters, "p");
 
     const [stats, projects, upcomingMilestones, dueSoonProjects, recentComments, recentFiles] =
       await Promise.all([
-        DashboardService.getScopedStats(),
+        DashboardService.getScopedStats(filters),
         query<ClientDashboardProject>(
           `SELECT p.id, p.name, p.status, p.completion_percentage, p.estimated_end_date
            FROM projects p
            WHERE p.deleted_at IS NULL AND p.is_active = 1
-          AND p.status NOT IN ${FINALIZED_PROJECT_STATUSES}
-             ${scope.sql ? `AND ${scope.sql}` : ""}
+           AND p.status NOT IN ${FINALIZED_PROJECT_STATUSES}
+              ${scope.sql ? `AND ${scope.sql}` : ""}
+              ${projectFilter.sql ? `AND (${projectFilter.sql})` : ""}
            ORDER BY (p.estimated_end_date IS NULL) ASC, p.estimated_end_date ASC
            LIMIT 10`,
-          scope.args,
+          [...scope.args, ...projectFilter.args],
         ),
-        MilestonesService.getUpcomingForScope(6),
-        DashboardService.fetchDueSoonProjects(6),
-        DashboardService.fetchRecentComments(6),
-        DashboardService.fetchRecentProjectFiles(5),
+        MilestonesService.getUpcomingForScope(6, filters.projectId),
+        DashboardService.fetchDueSoonProjects(6, 30, filters),
+        DashboardService.fetchRecentComments(6, filters),
+        DashboardService.fetchRecentProjectFiles(5, filters),
       ]);
 
     return {
@@ -649,7 +764,7 @@ export class DashboardService {
    * listados se resuelven con los fragmentos de alcance (clientScope /
    * projectScope), de modo que la autorización ocurre en la capa de datos.
    */
-  static async getIntermediaryPanel(actor: SessionProfile): Promise<IntermediaryPanelData> {
+  static async getIntermediaryPanel(actor: SessionProfile, filters: DashboardFilters = {}): Promise<IntermediaryPanelData> {
     if (actor.role !== "Intermediary") {
       throw new Error("Only intermediaries can access this panel.");
     }
@@ -657,6 +772,8 @@ export class DashboardService {
     const clientClause = await clientScope("id");
     const projectClause = await projectScope("p.id");
     const taskClause = await projectScope("t.project_id");
+    const projectFilter = projectFilterFragment(filters, "p");
+    const taskFilter = taskFilterFragment(filters, "t");
 
     const [
       totalClients,
@@ -679,20 +796,22 @@ export class DashboardService {
       countRows(
         `SELECT COUNT(*) AS total FROM projects p
          WHERE p.deleted_at IS NULL AND p.is_active = 1 AND p.status NOT IN ${FINALIZED_PROJECT_STATUSES}
-           AND ${projectClause.sql}`,
-        projectClause.args,
+           AND ${projectClause.sql}${projectFilter.sql ? ` AND (${projectFilter.sql})` : ""}`,
+        [...projectClause.args, ...projectFilter.args],
       ),
       countRows(
         `SELECT COUNT(*) AS total FROM projects p
-         WHERE p.deleted_at IS NULL AND p.status = 'Completed' AND ${projectClause.sql}`,
-        projectClause.args,
+         WHERE p.deleted_at IS NULL AND p.status = 'Completed'
+           AND ${projectClause.sql}${projectFilter.sql ? ` AND (${projectFilter.sql})` : ""}`,
+        [...projectClause.args, ...projectFilter.args],
       ),
       countRows(
         `SELECT COUNT(*) AS total FROM tasks t
-         WHERE t.deleted_at IS NULL AND t.status = 'Pending' AND ${taskClause.sql}`,
-        taskClause.args,
+         WHERE t.deleted_at IS NULL AND t.status = 'Pending'
+           AND ${taskClause.sql}${taskFilter.sql ? ` AND (${taskFilter.sql})` : ""}`,
+        [...taskClause.args, ...taskFilter.args],
       ),
-      DashboardService.fetchDueSoonProjects(6),
+      DashboardService.fetchDueSoonProjects(6, 30, filters),
       query<PendingTaskSummary>(
         `SELECT t.id, t.title, t.priority, t.estimated_end, p.name AS project_name
          FROM tasks t
@@ -701,11 +820,12 @@ export class DashboardService {
          WHERE t.deleted_at IS NULL AND t.status = 'Pending'
            AND p.deleted_at IS NULL AND c.deleted_at IS NULL AND c.is_active = 1
            AND ${taskClause.sql}
+           ${taskFilter.sql ? `AND (${taskFilter.sql})` : ""}
          ORDER BY (t.estimated_end IS NULL) ASC, t.estimated_end ASC
          LIMIT 6`,
-        [...taskClause.args],
+        [...taskClause.args, ...taskFilter.args],
       ),
-      DashboardService.fetchRecentComments(6),
+      DashboardService.fetchRecentComments(6, filters),
     ]);
 
     return {
@@ -720,6 +840,95 @@ export class DashboardService {
       dueSoonProjects,
       pendingTasks: pendingTaskRows,
       recentComments,
+    };
+  }
+
+  // ============================================================
+  // Historia 11.13 — Dashboard export (ModuleReport shape so the shared
+  // export libraries lib/exports + lib/export-pdf can be reused as-is).
+  // ============================================================
+
+  static async getDashboardReport(user: SessionProfile, filters: DashboardFilters = {}) {
+    const stats = await DashboardService.getStats(user, filters);
+
+    const kpis = [
+      { label: "Active Projects", value: stats.activeProjects },
+      { label: "Completed Projects", value: stats.completedProjects },
+      { label: "Delayed Projects", value: stats.delayedProjects },
+      { label: "Pending Tasks", value: stats.pendingTasks },
+      { label: "Blocked Tasks", value: stats.blockedTasks },
+      { label: "Overdue Tasks", value: "—" },
+      { label: "Estimated Hours", value: Math.round(stats.totalEstimatedHours) },
+      { label: "Worked Hours", value: Math.round(stats.totalWorkedHours) },
+      { label: "Average Progress", value: `${Math.round(stats.averageProgress)}%` },
+    ];
+
+    const scope = await projectScope("p.id");
+    const projectFilter = projectFilterFragment(filters, "p");
+    const rows = await query<{
+      id: string;
+      name: string;
+      status: string;
+      completion_percentage: number | null;
+      estimated_end_date: string | null;
+      estimated_hours: number | null;
+      worked_hours: number | null;
+      client_name: string;
+    }>(
+      `SELECT p.id, p.name, p.status, p.completion_percentage, p.estimated_end_date,
+              p.estimated_hours, p.worked_hours, c.company_name AS client_name
+       FROM projects p
+       JOIN clients c ON c.id = p.client_id
+       WHERE p.deleted_at IS NULL AND c.deleted_at IS NULL
+         ${scope.sql ? `AND ${scope.sql}` : ""}
+         ${projectFilter.sql ? `AND (${projectFilter.sql})` : ""}
+       ORDER BY p.name ASC
+       LIMIT 100`,
+      [...scope.args, ...projectFilter.args],
+    );
+
+    const overdueTasks = await countRows(
+      `SELECT COUNT(*) AS total FROM tasks
+       WHERE deleted_at IS NULL AND is_active = 1
+         AND status NOT IN ('Completed', 'Cancelled')
+         AND estimated_end IS NOT NULL AND estimated_end < ?
+         ${filters.projectId ? "AND project_id = ?" : ""}
+         ${filters.priority ? "AND priority = ?" : ""}`,
+      [
+        new Date().toISOString().slice(0, 10),
+        ...(filters.projectId ? [filters.projectId] : []),
+        ...(filters.priority ? [filters.priority] : []),
+      ],
+    );
+    kpis[5] = { label: "Overdue Tasks", value: overdueTasks };
+
+    return {
+      id: "dashboard",
+      title: `Dashboard — ${user.role}`,
+      kpis,
+      table: {
+        columns: ["Project", "Client", "Status", "Progress %", "Due Date", "Estimated h", "Worked h"],
+        rows: rows.map((row) => [
+          row.name,
+          row.client_name,
+          row.status,
+          row.completion_percentage ?? 0,
+          row.estimated_end_date ?? "—",
+          row.estimated_hours ?? 0,
+          row.worked_hours ?? 0,
+        ]),
+      },
+      chart: {
+        title: "Tasks by Status",
+        type: "bar" as const,
+        items: [
+          { label: "Pending", value: stats.pendingTasks },
+          { label: "In Progress", value: stats.inProgressTasks },
+          { label: "Blocked", value: stats.blockedTasks },
+          { label: "Completed", value: stats.completedTasks },
+        ],
+      },
+      generatedAt: new Date().toISOString(),
     };
   }
 

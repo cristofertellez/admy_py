@@ -5,6 +5,32 @@ import { DataTable } from "@/components/tables/data-table";
 import { Badge } from "@/components/shared/badge";
 import type { ActivityLog } from "@/features/activity";
 
+function renderChangeSummary(log: ActivityLog): string {
+  const parse = (raw: string | null) => {
+    if (!raw) return null;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return Object.entries(parsed as Record<string, unknown>)
+          .map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`)
+          .join("; ");
+      }
+      return String(parsed);
+    } catch {
+      return raw;
+    }
+  };
+
+  const oldValue = parse(log.old_value);
+  const newValue = parse(log.new_value);
+
+  if (!oldValue && !newValue) return "—";
+  if (oldValue && newValue) return `${oldValue} → ${newValue}`;
+  return newValue ?? oldValue ?? "—";
+}
+
+// Historia 16.8 — each row can disclose the recorded old/new values, the
+// responsible user, date and time of the change.
 const columns: ColumnDef<ActivityLog>[] = [
   {
     accessorKey: "action",
@@ -28,6 +54,22 @@ const columns: ColumnDef<ActivityLog>[] = [
     accessorKey: "created_at",
     header: "Date",
     cell: ({ getValue }) => new Date(getValue() as string).toLocaleString(),
+  },
+  {
+    id: "changes",
+    header: "Changes",
+    cell: ({ row }) => {
+      const summary = renderChangeSummary(row.original);
+      if (summary === "—") return <span className="text-muted-soft">—</span>;
+      return (
+        <details className="max-w-md">
+          <summary className="cursor-pointer truncate text-caption text-primary">
+            View change details
+          </summary>
+          <p className="mt-1 whitespace-pre-wrap break-words text-caption text-muted">{summary}</p>
+        </details>
+      );
+    },
   },
 ];
 

@@ -8,6 +8,7 @@ export interface ActivityLog {
   entity_id: string | null;
   old_value: string | null;
   new_value: string | null;
+  ip_address: string | null;
   created_at: string;
 }
 
@@ -15,6 +16,8 @@ export interface ActivityLogFilters {
   search?: string;
   userId?: string;
   entity?: string;
+  entityId?: string;
+  actions?: string[];
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -113,3 +116,23 @@ export function getActivityEntityHref(entity: string, entityId: string | null): 
 // log and excluded from entity history timelines, whose scope is limited to
 // business events per BACKLOG (4.7 / 5.5).
 export const ACCESS_AUDIT_ACTIONS = ["viewed_project", "downloaded_file"] as const;
+
+// Historia 16.13 — security events: denials, authentication failures,
+// permission/role changes and other critical account mutations. Used by the
+// activity page to offer a dedicated security filter.
+export const SECURITY_AUDIT_ACTIONS = [
+  "access_denied",
+  "login_failed",
+  "logged_in",
+  "logged_out",
+  "requested_password_reset",
+  "reset_password",
+  "changed_password",
+  "changed_role",
+  "updated_permissions",
+  "updated_settings",
+  "restored_settings",
+  "imported_settings",
+  "exported_settings",
+  "purged_activity_logs",
+] as const;

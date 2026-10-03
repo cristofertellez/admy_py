@@ -11,6 +11,7 @@ import { getUser, hasPermission } from "@/lib/auth";
 import { isAccessDeniedError } from "@/lib/auth-scope";
 import { redirect } from "next/navigation";
 import { TaskDetail } from "./task-detail";
+import { TrackRecentView } from "@/components/pwa/track-recent-view";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shared/card";
 import { Badge } from "@/components/shared/badge";
 import Link from "next/link";
@@ -114,6 +115,7 @@ export default async function TaskDetailPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
+      <TrackRecentView type="task" id={id} title={task.title as string} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/dashboard/tasks" className="text-body-sm text-muted hover:text-body-strong">&larr; Back to Tasks</Link>

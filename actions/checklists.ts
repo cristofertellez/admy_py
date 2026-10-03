@@ -2,16 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { ChecklistsService } from "@/features/checklists";
-import { getUser, requirePermission } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
+import { ActivityService } from "@/services/activity.service";
 
 export async function createChecklistItem(
   _prevState: unknown,
   formData: FormData
 ): Promise<{ success?: string; error?: string }> {
-  await requirePermission("tasks.create");
+  const actor = await requirePermission("tasks.create");
 
   try {
-    const user = await getUser();
     const taskId = formData.get("task_id") as string;
     const title = formData.get("title") as string;
 
@@ -22,7 +22,16 @@ export async function createChecklistItem(
     await ChecklistsService.create({
       task_id: taskId,
       title,
-      created_by: user?.id,
+      created_by: actor.id,
+    });
+
+    // Historia 7.23 — checklist changes are part of the task audit trail.
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "created_checklist_item",
+      entity: "Task",
+      entity_id: taskId,
+      new_value: { title },
     });
 
     revalidatePath(`/dashboard/tasks/${taskId}`);
@@ -36,7 +45,7 @@ export async function toggleChecklistItem(
   _prevState: unknown,
   formData: FormData
 ): Promise<{ success?: string; error?: string }> {
-  await requirePermission("tasks.update");
+  const actor = await requirePermission("tasks.update");
 
   try {
     const id = formData.get("id") as string;
@@ -46,9 +55,17 @@ export async function toggleChecklistItem(
       return { error: "Checklist item ID is required." };
     }
 
-    await ChecklistsService.toggle(id);
+    const updated = await ChecklistsService.toggle(id);
 
-    revalidatePath(`/dashboard/tasks/${taskId}`);
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "toggled_checklist_item",
+      entity: "Task",
+      entity_id: taskId || undefined,
+      new_value: { checklist_item_id: id, completed: updated?.is_completed ?? null },
+    });
+
+    if (taskId) revalidatePath(`/dashboard/tasks/${taskId}`);
     return { success: "Checklist item toggled." };
   } catch {
     return { error: "Failed to toggle checklist item." };
@@ -59,7 +76,7 @@ export async function deleteChecklistItem(
   _prevState: unknown,
   formData: FormData
 ): Promise<{ success?: string; error?: string }> {
-  await requirePermission("tasks.update");
+  const actor = await requirePermission("tasks.update");
 
   try {
     const id = formData.get("id") as string;
@@ -71,7 +88,15 @@ export async function deleteChecklistItem(
 
     await ChecklistsService.delete(id);
 
-    revalidatePath(`/dashboard/tasks/${taskId}`);
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "deleted_checklist_item",
+      entity: "Task",
+      entity_id: taskId || undefined,
+      old_value: { checklist_item_id: id },
+    });
+
+    if (taskId) revalidatePath(`/dashboard/tasks/${taskId}`);
     return { success: "Checklist item deleted." };
   } catch {
     return { error: "Failed to delete checklist item." };

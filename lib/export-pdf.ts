@@ -1,13 +1,19 @@
 "use client";
 
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import type { ModuleReport } from "@/features/reports";
 
 // Historia 12.10 — exportación PDF centralizada en el cliente. Recibe el
 // ModuleReport ya autorizado por el servidor y compone un documento único
 // con KPIs, tabla de detalle y datos del gráfico.
-export function exportReportPdf(report: ModuleReport) {
+//
+// Historia 14.10 — jsPDF is loaded on demand so the PDF library (the
+// heaviest client dependency) stays out of the initial bundle.
+export async function exportReportPdf(report: ModuleReport) {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+
   const doc = new jsPDF();
 
   doc.setFontSize(16);

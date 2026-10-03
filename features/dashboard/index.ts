@@ -3,7 +3,13 @@ export {
   assessAtRiskProject,
   getCommentContextHref,
 } from "./dashboard.service";
+export {
+  getPanelWidgets,
+  parseWidgetLayout,
+  resolveWidgetLayout,
+} from "./dashboard-widgets";
 export type {
+  DashboardFilters,
   AdminOverview,
   AdminUserStats,
   RoleDistributionItem,
@@ -21,3 +27,9 @@ export type {
   ClientDashboardProject,
   ClientDashboardData,
 } from "./dashboard.service";
+export type {
+  DashboardPanelId,
+  DashboardWidgetConfig,
+  DashboardWidgetDefinition,
+  WidgetLayoutMap,
+} from "./dashboard-widgets";

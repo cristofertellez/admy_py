@@ -13,8 +13,27 @@ import type { IntermediaryPanelData, PendingTaskSummary } from "@/features/dashb
 
 const DUE_SOON_WINDOW_DAYS = 30;
 
-export function IntermediaryPanel({ data }: { data: IntermediaryPanelData }) {
+export function IntermediaryPanel({
+  data,
+  widgets,
+}: {
+  data: IntermediaryPanelData;
+  widgets: { id: string; label: string }[];
+}) {
   const { stats, dueSoonProjects, pendingTasks, recentComments } = data;
+
+  const widgetById: Record<string, React.ReactNode> = {
+    dueSoonProjects: <DueSoonCard key="dueSoonProjects" projects={dueSoonProjects} />,
+    pendingTasks: <PendingTasksCard key="pendingTasks" tasks={pendingTasks} />,
+    recentComments: (
+      <div key="recentComments" className="lg:col-span-2">
+        <CommentsCard
+          comments={recentComments}
+          emptyMessage="No comments on your clients or projects yet."
+        />
+      </div>
+    ),
+  };
 
   return (
     <div className="space-y-6">
@@ -34,14 +53,8 @@ export function IntermediaryPanel({ data }: { data: IntermediaryPanelData }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <DueSoonCard projects={dueSoonProjects} />
-        <PendingTasksCard tasks={pendingTasks} />
+        {widgets.map((widget) => widgetById[widget.id] ?? null)}
       </div>
-
-      <CommentsCard
-        comments={recentComments}
-        emptyMessage="No comments on your clients or projects yet."
-      />
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ActivityTable } from "./activity-table";
 import { ActivityTimeline } from "./activity-timeline";
 import { useDebounce } from "@/hooks/use-debounce";
+import { getActivityExportReport } from "@/actions/activity";
+import { exportReportPdf } from "@/lib/export-pdf";
 import type { ActivityLog, ActivityUserOption, ActivityView as ViewMode } from "@/features/activity";
 
 interface ActivityViewProps {
@@ -14,6 +16,7 @@ interface ActivityViewProps {
   entities: string[];
   initialFilters: { search: string; user: string; entity: string; from: string; to: string };
   view: ViewMode;
+  securityOnly: boolean;
   pageIndex: number;
   pageSize: number;
 }
@@ -25,6 +28,7 @@ export function ActivityView({
   entities,
   initialFilters,
   view,
+  securityOnly,
   pageIndex,
   pageSize,
 }: ActivityViewProps) {
@@ -34,6 +38,7 @@ export function ActivityView({
 
   const [searchInput, setSearchInput] = useState(initialFilters.search);
   const [, startTransition] = useTransition();
+  const [exporting, setExporting] = useState(false);
   const debouncedSearch = useDebounce(searchInput, 400);
 
   function navigate(overrides: Record<string, string | undefined>) {
@@ -149,6 +154,53 @@ export function ActivityView({
             Timeline
           </button>
         </div>
+
+        <label className="flex items-center gap-2 text-body-sm text-body-strong">
+          <input
+            type="checkbox"
+            checked={securityOnly}
+            onChange={(e) => navigate({ security: e.target.checked ? "1" : undefined, page: undefined })}
+            className="h-4 w-4 rounded border-hairline"
+          />
+          Security events only
+        </label>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={() => {
+              setExporting(true);
+              startTransition(async () => {
+                const { report, error } = await getActivityExportReport({
+                  search: initialFilters.search || undefined,
+                  userId: initialFilters.user || undefined,
+                  entity: initialFilters.entity || undefined,
+                  dateFrom: initialFilters.from || undefined,
+                  dateTo: initialFilters.to || undefined,
+                });
+                setExporting(false);
+                if (error || !report) return;
+                exportReportPdf(report);
+              });
+            }}
+            className="rounded-md border border-hairline bg-surface-card px-3 py-1.5 text-body-sm text-muted hover:text-body-strong disabled:opacity-50"
+          >
+            {exporting ? "Exporting…" : "Export PDF"}
+          </button>
+          <a
+            href={`/api/activity/export?format=csv&${buildExportQuery(initialFilters).toString()}`}
+            className="rounded-md border border-hairline bg-surface-card px-3 py-1.5 text-body-sm text-muted hover:text-body-strong"
+          >
+            CSV
+          </a>
+          <a
+            href={`/api/activity/export?format=xlsx&${buildExportQuery(initialFilters).toString()}`}
+            className="rounded-md border border-hairline bg-surface-card px-3 py-1.5 text-body-sm text-muted hover:text-body-strong"
+          >
+            Excel
+          </a>
+        </div>
       </div>
 
       {view === "timeline" ? (
@@ -180,4 +232,14 @@ export function ActivityView({
 
 function formatUserName(firstName: string, lastName: string): string {
   return [firstName, lastName].filter(Boolean).join(" ");
+}
+
+function buildExportQuery(filters: { search: string; user: string; entity: string; from: string; to: string }) {
+  const query = new URLSearchParams();
+  if (filters.search) query.set("search", filters.search);
+  if (filters.user) query.set("user", filters.user);
+  if (filters.entity) query.set("entity", filters.entity);
+  if (filters.from) query.set("from", filters.from);
+  if (filters.to) query.set("to", filters.to);
+  return query;
 }
