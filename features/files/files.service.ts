@@ -1,6 +1,23 @@
 import { countRows, newId, query, queryOne, type InValue } from "@/lib/turso/client";
-import { assertEntityVisible, attachmentScope } from "@/lib/auth-scope";
-import { deleteFromR2, getSignedDownloadUrl, isBucket } from "@/lib/storage/r2";
+import { assertEntityVisible, attachmentScope, isScopedEntityType } from "@/lib/auth-scope";
+import { deleteFromR2, getSignedDownloadUrl, isBucket, uploadToR2 } from "@/lib/storage/r2";
+
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+export const ALLOWED_FILE_TYPES: Record<string, string> = {
+  "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/svg+xml": "svg",
+  "image/webp": "webp",
+  "application/zip": "zip",
+  "application/x-zip-compressed": "zip",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+};
 
 export const FILE_CATEGORIES = [
   "Documentación",
@@ -58,17 +75,88 @@ export interface FileShareRow {
 }
 
 export class FilesService {
+  // ============================================================
+  // Upload (Historia 10.2) — lógica centralizada usada por la Server Action
+  // y por el Route Handler (subida con progreso/cancelación vía XHR).
+  // ============================================================
+
+  static async uploadAttachment(input: {
+    file: File;
+    userId: string;
+    entityType: string;
+    entityId: string;
+    category?: string;
+    versionOf?: string | null;
+  }): Promise<{ id: string; filename: string; entity_type: string; entity_id: string; version: number }> {
+    const { file, userId, entityType, entityId } = input;
+    const category = input.category || "Otros";
+    const versionOf = input.versionOf ?? null;
+
+    if (!isScopedEntityType(entityType)) {
+      throw new Error("Invalid entity type.");
+    }
+    if (!FILE_CATEGORIES.includes(category as never)) {
+      throw new Error("Invalid category.");
+    }
+
+    await assertEntityVisible(entityType, entityId);
+
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error("File size must be under 10MB.");
+    }
+
+    const mimeType = file.type;
+    const extension = ALLOWED_FILE_TYPES[mimeType];
+    if (!extension) {
+      throw new Error("File type not allowed.");
+    }
+
+    const bucket = "attachments";
+    if (!isBucket(bucket)) {
+      throw new Error("Invalid storage bucket.");
+    }
+
+    // Versioning (10.4): a new revision inherits the original's entity and
+    // increments the version number.
+    let version = 1;
+    if (versionOf) {
+      const original = await queryOne<{ version: number; entity_type: string; entity_id: string }>(
+        "SELECT version, entity_type, entity_id FROM attachments WHERE id = ? AND deleted_at IS NULL",
+        [versionOf],
+      );
+      if (!original) throw new Error("Original file not found.");
+      version = Number(original.version) + 1;
+      await assertEntityVisible(original.entity_type, original.entity_id);
+    }
+
+    const sanitizedName = file.name.replace(/\s+/g, "_").replace(/[/\\]+/g, "");
+    const storagePath = `${crypto.randomUUID()}-${sanitizedName}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    await uploadToR2(bucket, storagePath, new Uint8Array(arrayBuffer), mimeType);
+
+    const id = newId();
+    await query(
+      `INSERT INTO attachments (id, bucket, storage_path, filename, extension, mime_type, size_bytes, uploaded_by, entity_type, entity_id, category, version, version_of)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, bucket, storagePath, file.name, extension, mimeType, file.size, userId, entityType, entityId, category, version, versionOf],
+    );
+
+    return { id, filename: file.name, entity_type: entityType, entity_id: entityId, version };
+  }
+
   static async list(filters: {
     entityType?: string;
     entityId?: string;
     search?: string;
     category?: string;
+    showDeleted?: boolean;
     page?: number;
     pageSize?: number;
   } = {}) {
-    const { search, entityType, entityId, category, page = 1, pageSize = 20 } = filters;
+    const { search, entityType, entityId, category, showDeleted = false, page = 1, pageSize = 20 } = filters;
 
-    const conditions = ["a.deleted_at IS NULL"];
+    const conditions = [showDeleted ? "a.deleted_at IS NOT NULL" : "a.deleted_at IS NULL"];
     const args: InValue[] = [];
 
     if (search) {
@@ -273,9 +361,22 @@ export class FilesService {
     return { filename: file.filename };
   }
 
-  // ============================================================
-  // Indicadores (Historia 10.12)
-  // ============================================================
+  // Historia 10.8 — eliminación permanente. Solo administradores (verificado
+  // en la capa de acciones); borra el registro y sus comparticiones.
+  static async deletePermanently(id: string): Promise<{ filename: string } | null> {
+    const file = await queryOne<{ filename: string; entity_type: string; entity_id: string }>(
+      "SELECT filename, entity_type, entity_id FROM attachments WHERE id = ? AND deleted_at IS NOT NULL",
+      [id],
+    );
+    if (!file) return null;
+
+    await assertEntityVisible(file.entity_type, file.entity_id);
+
+    await query("DELETE FROM file_shares WHERE attachment_id = ?", [id]);
+    await query("DELETE FROM attachments WHERE id = ?", [id]);
+
+    return { filename: file.filename };
+  }
 
   static async getStats() {
     const scope = await attachmentScope("a.entity_type", "a.entity_id");
@@ -306,6 +407,33 @@ export class FilesService {
       total: Number(totalRow?.total ?? 0),
       bytesUsed: Number(spaceRow?.bytes ?? 0),
       recent: recent.map(withUploader),
+      // Últimas descargas registradas en el log de actividad (10.12): el nombre
+      // del archivo se persiste en new_value.filename al registrar la descarga.
+      recentDownloads: (
+        await query<{ new_value: string | null; created_at: string }>(
+          `SELECT new_value, created_at
+           FROM activity_logs
+           WHERE action = 'downloaded_file'
+           ORDER BY created_at DESC
+           LIMIT 25`,
+        )
+      )
+        .map((row) => {
+          let filename: string | null = null;
+          if (row.new_value) {
+            try {
+              const parsed: unknown = JSON.parse(row.new_value);
+              if (parsed && typeof parsed === "object") {
+                filename = (parsed as { filename?: string }).filename ?? null;
+              }
+            } catch {
+              filename = null;
+            }
+          }
+          return filename ? { filename, date: row.created_at } : null;
+        })
+        .filter((row): row is { filename: string; date: string } => row !== null)
+        .slice(0, 5),
     };
   }
 
@@ -378,4 +506,40 @@ export class FilesService {
 
     await query("DELETE FROM file_shares WHERE id = ? AND attachment_id = ?", [shareId, fileId]);
   }
+}
+
+// Helpers compartidos por la Server Action y el Route Handler de subida:
+// convención única de entidad para el log de actividad y resolución del
+// proyecto asociado para notificaciones (Historias 9.16 / 10.14).
+export function toActivityEntity(entityType: string): string {
+  return entityType.charAt(0).toUpperCase() + entityType.slice(1);
+}
+
+export async function resolveFileProjectId(entityType: string, entityId: string): Promise<string | null> {
+  if (entityType === "project") return entityId;
+  if (entityType === "task") {
+    const row = await queryOne<{ project_id: string }>(
+      "SELECT project_id FROM tasks WHERE id = ? LIMIT 1",
+      [entityId],
+    );
+    return row?.project_id ?? null;
+  }
+  if (entityType === "milestone") {
+    const row = await queryOne<{ project_id: string }>(
+      "SELECT project_id FROM milestones WHERE id = ? LIMIT 1",
+      [entityId],
+    );
+    return row?.project_id ?? null;
+  }
+  if (entityType === "comment") {
+    const row = await queryOne<{ project_id: string }>(
+      `SELECT c.project_id FROM project_comments c WHERE c.id = ?
+       UNION ALL SELECT t.project_id FROM task_comments tc JOIN tasks t ON t.id = tc.task_id WHERE tc.id = ?
+       UNION ALL SELECT m.project_id FROM milestone_comments mc JOIN milestones m ON m.id = mc.milestone_id WHERE mc.id = ?
+       LIMIT 1`,
+      [entityId, entityId, entityId],
+    );
+    return row?.project_id ?? null;
+  }
+  return null;
 }

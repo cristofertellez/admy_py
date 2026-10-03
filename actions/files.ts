@@ -1,61 +1,11 @@
 "use server";
 
 import { getUser, requirePermission } from "@/lib/auth";
-import { isBucket, uploadToR2 } from "@/lib/storage/r2";
-import { newId, query, queryOne } from "@/lib/turso/client";
-import { assertEntityVisible, isScopedEntityType } from "@/lib/auth-scope";
-import { FilesService, FILE_CATEGORIES } from "@/features/files";
+import { FilesService, FILE_CATEGORIES, resolveFileProjectId, toActivityEntity } from "@/features/files";
 import { notifyFileUploaded } from "@/features/notifications";
 import { ActivityService } from "@/services/activity.service";
+import { hasFullAccess } from "@/lib/roles";
 import { revalidatePath } from "next/cache";
-
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES: Record<string, string> = {
-  "application/pdf": "pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/svg+xml": "svg",
-  "image/webp": "webp",
-  "application/zip": "zip",
-};
-
-// Activity events use capitalized entity labels ("Client", "Project", ...) so
-// that every module's history queries resolve them consistently.
-function toActivityEntity(entityType: string): string {
-  return entityType.charAt(0).toUpperCase() + entityType.slice(1);
-}
-
-async function resolveProjectId(entityType: string, entityId: string): Promise<string | null> {
-  if (entityType === "project") return entityId;
-  if (entityType === "task") {
-    const row = await queryOne<{ project_id: string }>(
-      "SELECT project_id FROM tasks WHERE id = ? LIMIT 1",
-      [entityId],
-    );
-    return row?.project_id ?? null;
-  }
-  if (entityType === "milestone") {
-    const row = await queryOne<{ project_id: string }>(
-      "SELECT project_id FROM milestones WHERE id = ? LIMIT 1",
-      [entityId],
-    );
-    return row?.project_id ?? null;
-  }
-  if (entityType === "comment") {
-    const row = await queryOne<{ project_id: string }>(
-      `SELECT c.project_id FROM project_comments c WHERE c.id = ?
-       UNION ALL SELECT t.project_id FROM task_comments tc JOIN tasks t ON t.id = tc.task_id WHERE tc.id = ?
-       UNION ALL SELECT m.project_id FROM milestone_comments mc JOIN milestones m ON m.id = mc.milestone_id WHERE mc.id = ?
-       LIMIT 1`,
-      [entityId, entityId, entityId],
-    );
-    return row?.project_id ?? null;
-  }
-  return null;
-}
 
 export async function uploadFile(_prevState: unknown, formData: FormData) {
   const user = await requirePermission("files.upload");
@@ -71,77 +21,26 @@ export async function uploadFile(_prevState: unknown, formData: FormData) {
       return { error: "File, entity type, and entity ID are required." };
     }
 
-    if (!isScopedEntityType(entityType)) {
-      return { error: "Invalid entity type." };
-    }
-
-    await assertEntityVisible(entityType, entityId, user);
-
-    if (file.size > MAX_FILE_SIZE) {
-      return { error: "File size must be under 10MB." };
-    }
-
-    const mimeType = file.type;
-    const extension = ALLOWED_TYPES[mimeType];
-    if (!extension) {
-      return { error: "File type not allowed." };
-    }
-
-    const bucket = "attachments";
-    if (!isBucket(bucket)) {
-      return { error: "Invalid storage bucket." };
-    }
-
-    // Versioning (10.4): a new revision inherits the original's entity and
-    // increments the version number.
-    let version = 1;
-    if (versionOf) {
-      const original = await queryOne<{ version: number; entity_type: string; entity_id: string }>(
-        "SELECT version, entity_type, entity_id FROM attachments WHERE id = ? AND deleted_at IS NULL",
-        [versionOf],
-      );
-      if (!original) return { error: "Original file not found." };
-      version = Number(original.version) + 1;
-      await assertEntityVisible(original.entity_type, original.entity_id, user);
-    }
-
-    const sanitizedName = file.name.replace(/\s+/g, "_").replace(/[/\\]+/g, "");
-    const storagePath = `${crypto.randomUUID()}-${sanitizedName}`;
-
-    const arrayBuffer = await file.arrayBuffer();
-    await uploadToR2(bucket, storagePath, new Uint8Array(arrayBuffer), mimeType);
-
-    await query(
-      `INSERT INTO attachments (id, bucket, storage_path, filename, extension, mime_type, size_bytes, uploaded_by, entity_type, entity_id, category, version, version_of)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        newId(),
-        bucket,
-        storagePath,
-        file.name,
-        extension,
-        mimeType,
-        file.size,
-        user.id,
-        entityType,
-        entityId,
-        category,
-        version,
-        versionOf,
-      ],
-    );
+    const created = await FilesService.uploadAttachment({
+      file,
+      userId: user.id,
+      entityType,
+      entityId,
+      category,
+      versionOf,
+    });
 
     await ActivityService.log({
       user_id: user.id,
       action: versionOf ? "uploaded_file_version" : "uploaded_file",
       entity: toActivityEntity(entityType),
       entity_id: entityId,
-      new_value: { filename: file.name, size_bytes: file.size, mime_type: mimeType, version },
+      new_value: { filename: created.filename, size_bytes: file.size, mime_type: file.type, version: created.version },
     });
 
-    const projectId = await resolveProjectId(entityType, entityId);
+    const projectId = await resolveFileProjectId(entityType, entityId);
     if (projectId) {
-      await notifyFileUploaded({ projectId, actorId: user.id, filename: file.name });
+      await notifyFileUploaded({ projectId, actorId: user.id, filename: created.filename });
     }
 
     revalidatePath(`/dashboard/${entityType}s`, "layout");
@@ -340,5 +239,31 @@ export async function unshareFile(fileId: string, shareId: string) {
     return { success: "Share removed." };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to remove share." };
+  }
+}
+
+// Historia 10.8 — eliminación permanente (solo Developer/Admin/Super Admin).
+export async function deleteFilePermanently(fileId: string) {
+  const user = await requirePermission("files.delete");
+  try {
+    if (!hasFullAccess(user.role)) {
+      return { error: "Only administrators can permanently delete files." };
+    }
+
+    const deleted = await FilesService.deletePermanently(fileId);
+    if (!deleted) return { error: "File not found or not in trash." };
+
+    await ActivityService.log({
+      user_id: user.id,
+      action: "permanently_deleted_file",
+      entity: "File",
+      entity_id: fileId,
+      old_value: { filename: deleted.filename },
+    });
+
+    revalidatePath("/dashboard/files", "layout");
+    return { success: "File permanently deleted." };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to permanently delete file." };
   }
 }

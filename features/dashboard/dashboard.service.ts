@@ -512,7 +512,7 @@ export class DashboardService {
        FROM projects p
        JOIN clients c ON c.id = p.client_id
        WHERE p.deleted_at IS NULL AND c.deleted_at IS NULL AND c.is_active = 1
-         AND p.status NOT IN (${FINALIZED_PROJECT_STATUSES})
+         AND p.status NOT IN ${FINALIZED_PROJECT_STATUSES}
          AND p.estimated_end_date IS NOT NULL AND p.estimated_end_date >= ? AND p.estimated_end_date <= ?
          ${scope.sql ? `AND ${scope.sql}` : ""}
        ORDER BY p.estimated_end_date ASC
@@ -563,7 +563,7 @@ export class DashboardService {
          JOIN clients c ON c.id = p.client_id
          LEFT JOIN tasks t ON t.project_id = p.id AND t.deleted_at IS NULL AND t.is_active = 1
          WHERE p.deleted_at IS NULL AND p.is_active = 1
-           AND p.status NOT IN (${FINALIZED_PROJECT_STATUSES})
+           AND p.status NOT IN ${FINALIZED_PROJECT_STATUSES}
          GROUP BY p.id
          ORDER BY overdue_milestones DESC, overdue_tasks DESC, blocked_tasks DESC
          LIMIT 24`,
@@ -622,7 +622,7 @@ export class DashboardService {
           `SELECT p.id, p.name, p.status, p.completion_percentage, p.estimated_end_date
            FROM projects p
            WHERE p.deleted_at IS NULL AND p.is_active = 1
-             AND p.status NOT IN (${FINALIZED_PROJECT_STATUSES})
+          AND p.status NOT IN ${FINALIZED_PROJECT_STATUSES}
              ${scope.sql ? `AND ${scope.sql}` : ""}
            ORDER BY (p.estimated_end_date IS NULL) ASC, p.estimated_end_date ASC
            LIMIT 10`,
@@ -678,7 +678,7 @@ export class DashboardService {
       ),
       countRows(
         `SELECT COUNT(*) AS total FROM projects p
-         WHERE p.deleted_at IS NULL AND p.is_active = 1 AND p.status NOT IN (${FINALIZED_PROJECT_STATUSES})
+         WHERE p.deleted_at IS NULL AND p.is_active = 1 AND p.status NOT IN ${FINALIZED_PROJECT_STATUSES}
            AND ${projectClause.sql}`,
         projectClause.args,
       ),

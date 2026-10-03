@@ -14,7 +14,7 @@ const ACTIVITY_SELECT = `
 
 const SORTABLE_COLUMNS = new Set(["created_at", "action", "entity"]);
 
-function buildWhere(filters: Pick<ActivityLogFilters, "search" | "userId" | "entity">) {
+function buildWhere(filters: Pick<ActivityLogFilters, "search" | "userId" | "entity" | "dateFrom" | "dateTo">) {
   const conditions: string[] = [];
   const args: InValue[] = [];
 
@@ -31,6 +31,14 @@ function buildWhere(filters: Pick<ActivityLogFilters, "search" | "userId" | "ent
     conditions.push("al.entity = ?");
     args.push(filters.entity);
   }
+  if (filters.dateFrom) {
+    conditions.push("al.created_at >= ?");
+    args.push(`${filters.dateFrom}T00:00:00.000Z`);
+  }
+  if (filters.dateTo) {
+    conditions.push("al.created_at <= ?");
+    args.push(`${filters.dateTo}T23:59:59.999Z`);
+  }
 
   const whereSql = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
   return { whereSql, args };
@@ -38,10 +46,10 @@ function buildWhere(filters: Pick<ActivityLogFilters, "search" | "userId" | "ent
 
 export class ActivityLogService {
   static async list(filters: ActivityLogFilters = {}): Promise<ActivityLogListResult> {
-    const { search, userId, entity, page = 1, pageSize = 20, sortBy = "created_at", sortOrder = "desc" } =
+    const { search, userId, entity, dateFrom, dateTo, page = 1, pageSize = 20, sortBy = "created_at", sortOrder = "desc" } =
       filters;
 
-    const { whereSql, args } = buildWhere({ search, userId, entity });
+    const { whereSql, args } = buildWhere({ search, userId, entity, dateFrom, dateTo });
     const orderColumn = SORTABLE_COLUMNS.has(sortBy) ? sortBy : "created_at";
     const direction = sortOrder === "asc" ? "ASC" : "DESC";
     const offset = (page - 1) * pageSize;

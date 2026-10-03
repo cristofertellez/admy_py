@@ -14,6 +14,8 @@ interface ActivityPageProps {
     search?: string;
     user?: string;
     entity?: string;
+    from?: string;
+    to?: string;
     view?: string;
     page?: string;
   }>;
@@ -26,11 +28,13 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
   const search = params.search?.trim() || undefined;
   const userId = params.user || undefined;
   const entity = params.entity || undefined;
+  const dateFrom = params.from || undefined;
+  const dateTo = params.to || undefined;
   const view = params.view === "timeline" ? "timeline" : "table";
   const page = Math.max(1, Number.parseInt(params.page || "1", 10) || 1);
 
   const [{ data: logs, total }, users, entities] = await Promise.all([
-    ActivityLogService.list({ search, userId, entity, page, pageSize: PAGE_SIZE }),
+    ActivityLogService.list({ search, userId, entity, dateFrom, dateTo, page, pageSize: PAGE_SIZE }),
     ActivityLogService.getUsersWithActivity(),
     ActivityLogService.getEntities(),
   ]);
@@ -46,7 +50,7 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
         total={total}
         users={users}
         entities={entities}
-        initialFilters={{ search: search ?? "", user: userId ?? "", entity: entity ?? "" }}
+        initialFilters={{ search: search ?? "", user: userId ?? "", entity: entity ?? "", from: dateFrom ?? "", to: dateTo ?? "" }}
         view={view}
         pageIndex={page - 1}
         pageSize={PAGE_SIZE}

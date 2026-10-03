@@ -15,6 +15,8 @@ export interface ActivityLogFilters {
   search?: string;
   userId?: string;
   entity?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   pageSize?: number;
   sortBy?: "created_at" | "action" | "entity";

@@ -31,6 +31,8 @@ import type {
 import type { ActivityLog } from "@/features/activity";
 import {
   useActionState,
+  useEffect,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -468,6 +470,17 @@ function CommentsTab({
 }) {
   const threads = buildThreads(comments);
 
+  // Historia 9.1 — auto-scroll: cuando llega un comentario nuevo se desplaza
+  // al final de la lista cronológica.
+  const listRef = useRef<HTMLOListElement>(null);
+  const prevCountRef = useRef(comments.length);
+  useEffect(() => {
+    if (comments.length > prevCountRef.current) {
+      listRef.current?.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+    prevCountRef.current = comments.length;
+  }, [comments.length]);
+
   return (
     <div className="space-y-6">
       {canComment ? (
@@ -482,7 +495,7 @@ function CommentsTab({
       {comments.length === 0 ? (
         <p className="text-body-sm text-muted-soft">No comments yet.</p>
       ) : (
-        <ol aria-label="Project comments" className="relative ml-3 space-y-4 border-l border-hairline pl-6">
+        <ol ref={listRef} aria-label="Project comments" className="relative ml-3 space-y-4 border-l border-hairline pl-6">
           {threads.map((thread) => (
             <li key={thread.id} className="space-y-3">
               <CommentCard projectId={projectId} comment={thread} currentUserId={currentUserId} canModerate={canModerate} canComment={canComment} canUploadFiles={canUploadFiles} canDeleteFiles={canDeleteFiles} canDownloadFiles={canDownloadFiles} />

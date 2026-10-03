@@ -4167,7 +4167,7 @@ P0
 
 Estado
 
-In Progress
+Done
 
 Dependencias
 
@@ -4187,25 +4187,25 @@ Permitir crear conversaciones dentro del sistema.
 
 ### Backend
 
-- [ ] Crear modelo Comment
-- [ ] Crear relaciones
-- [ ] Registrar auditoría
+- [x] Crear modelo Comment
+- [x] Crear relaciones
+- [x] Registrar auditoría
 
 ### Frontend
 
-- [ ] Editor de comentarios
-- [ ] Lista cronológica
-- [ ] Scroll automático
+- [x] Editor de comentarios
+- [x] Lista cronológica
+- [x] Scroll automático
 
 ### QA
 
-- [ ] Crear comentario
-- [ ] Mostrar comentarios
-- [ ] Orden cronológico
+- [x] Crear comentario
+- [x] Mostrar comentarios
+- [x] Orden cronológico
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4221,19 +4221,19 @@ Cada proyecto deberá tener su propio historial de comentarios.
 
 ### Funciones
 
-- [ ] Crear comentario
-- [ ] Editar comentario propio
-- [ ] Eliminar comentario propio
-- [ ] Responder comentarios
+- [x] Crear comentario
+- [x] Editar comentario propio
+- [x] Eliminar comentario propio
+- [x] Responder comentarios
 
 ### QA
 
 - [x] Validar permisos
-- [ ] Validar historial
+- [x] Validar historial
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4247,13 +4247,13 @@ Comentarios por Tarea
 
 ### Funciones
 
-- [ ] Conversación independiente
-- [ ] Historial
-- [ ] Respuestas
+- [x] Conversación independiente
+- [x] Historial
+- [x] Respuestas
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4273,7 +4273,7 @@ Comentarios por Hito
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4296,7 +4296,7 @@ Editor Enriquecido
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4330,7 +4330,7 @@ Ejemplos
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4358,7 +4358,7 @@ Permitir adjuntar.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4379,7 +4379,7 @@ Permitir reaccionar mediante.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4402,7 +4402,7 @@ Edición de Comentarios
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4416,13 +4416,13 @@ Eliminar Comentarios
 
 ### Backend
 
-- [ ] Eliminación lógica
-- [ ] Restauración
-- [ ] Auditoría
+- [x] Eliminación lógica
+- [x] Restauración
+- [x] Auditoría
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4451,7 +4451,7 @@ Registrar automáticamente.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4480,7 +4480,7 @@ Filtros
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4502,7 +4502,7 @@ El cliente podrá visualizar únicamente.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4523,7 +4523,7 @@ Mostrar únicamente.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4545,7 +4545,7 @@ Buscar comentarios por.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4567,7 +4567,7 @@ Generar notificaciones cuando.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4581,29 +4581,29 @@ Permisos
 
 Developer
 
-- [ ] Acceso completo
+- [x] Acceso completo
 
 Intermediary
 
-- [ ] Ver comentarios autorizados
-- [ ] Crear comentarios
+- [x] Ver comentarios autorizados
+- [x] Crear comentarios
 
 Client
 
-- [ ] Ver comentarios compartidos
-- [ ] Comentar únicamente cuando esté permitido
+- [x] Ver comentarios compartidos
+- [x] Comentar únicamente cuando esté permitido
 
 Administrator
 
-- [ ] Gestión completa
+- [x] Gestión completa
 
 Super Administrator
 
-- [ ] Acceso total
+- [x] Acceso total
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4627,7 +4627,7 @@ Registrar
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4652,7 +4652,7 @@ Integrar con.
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4687,7 +4687,7 @@ P0
 
 Estado
 
-In Progress
+Done
 
 Dependencias
 
@@ -4717,9 +4717,9 @@ Visualizar todos los archivos disponibles según los permisos del usuario.
 ### Frontend
 
 - [x] DataTable
-- [ ] Vista en cuadrícula
-- [ ] Vista en lista
-- [ ] Selector de vista
+- [x] Vista en cuadrícula
+- [x] Vista en lista
+- [x] Selector de vista
 
 Filtros
 
@@ -4733,13 +4733,13 @@ Filtros
 
 ### QA
 
-- [ ] Rendimiento
-- [ ] Permisos
-- [ ] Responsive
+- [x] Rendimiento
+- [x] Permisos
+- [x] Responsive
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4753,17 +4753,17 @@ Subida de Archivos
 
 ### Backend
 
-- [ ] Integrar Cloudflare R2
-- [ ] Validar tamaño
-- [ ] Validar tipo MIME
-- [ ] Registrar auditoría
+- [x] Integrar Cloudflare R2
+- [x] Validar tamaño
+- [x] Validar tipo MIME
+- [x] Registrar auditoría
 
 ### Frontend
 
-- [ ] Drag & Drop
-- [ ] Selector de archivos
-- [ ] Barra de progreso
-- [ ] Cancelar carga
+- [x] Drag & Drop
+- [x] Selector de archivos
+- [x] Barra de progreso
+- [x] Cancelar carga
 
 Tipos permitidos
 
@@ -4780,13 +4780,13 @@ Tipos permitidos
 
 ### QA
 
-- [ ] Validar tamaño máximo
-- [ ] Validar extensiones
-- [ ] Validar subida múltiple
+- [x] Validar tamaño máximo
+- [x] Validar extensiones
+- [x] Validar subida múltiple
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4817,7 +4817,7 @@ Categorías
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4838,11 +4838,11 @@ Funciones
 - [x] Subir nueva versión
 - [x] Consultar historial
 - [x] Restaurar versión
-- [ ] Comparar versiones (preparado)
+- [x] Comparar versiones (preparado)
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4864,11 +4864,11 @@ Permitir visualizar sin descargar
 ### QA
 
 - [x] Renderizado correcto
-- [ ] Responsive
+- [x] Responsive
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4894,7 +4894,7 @@ Descarga de Archivos
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4920,7 +4920,7 @@ Permitir mover archivos entre
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4935,7 +4935,7 @@ Eliminar Archivos
 ### Backend
 
 - [x] Eliminación lógica
-- [ ] Eliminación permanente (solo administradores)
+- [x] Eliminación permanente (solo administradores)
 - [x] Restauración
 
 ### QA
@@ -4945,7 +4945,7 @@ Eliminar Archivos
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4971,7 +4971,7 @@ Opciones
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -4997,7 +4997,7 @@ Registrar automáticamente
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5020,7 +5020,7 @@ Buscar archivos por
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5042,7 +5042,7 @@ Mostrar
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5056,32 +5056,32 @@ Permisos
 
 Developer
 
-- [ ] Acceso completo
+- [x] Acceso completo
 
 Intermediary
 
-- [ ] Acceso a archivos de proyectos asignados
+- [x] Acceso a archivos de proyectos asignados
 
 Client
 
-- [ ] Acceso únicamente a archivos compartidos
+- [x] Acceso únicamente a archivos compartidos
 
 Administrator
 
-- [ ] Gestión completa
+- [x] Gestión completa
 
 Super Administrator
 
-- [ ] Acceso total
+- [x] Acceso total
 
 ### QA
 
-- [ ] Validar RBAC
-- [ ] Validar autorización a nivel de datos
+- [x] Validar RBAC
+- [x] Validar autorización a nivel de datos
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5105,7 +5105,7 @@ Registrar
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5131,7 +5131,7 @@ Integraciones obligatorias
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5695,20 +5695,20 @@ Crear un módulo centralizado donde el usuario pueda consultar todos los reporte
 
 ### Backend
 
-- [ ] Obtener listado de reportes
+- [x] Obtener listado de reportes
 - [x] Validar permisos
-- [ ] Registrar auditoría
+- [x] Registrar auditoría
 
 ### Frontend
 
-- [ ] Pantalla principal
-- [ ] Categorías
+- [x] Pantalla principal
+- [x] Categorías
 - [x] Buscador
-- [ ] Favoritos
+- [x] Favoritos
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5722,24 +5722,24 @@ Reporte de Proyectos
 
 Mostrar
 
-- [ ] Total de proyectos
-- [ ] Proyectos activos
-- [ ] Proyectos finalizados
-- [ ] Proyectos cancelados
-- [ ] Estado por proyecto
-- [ ] Tiempo estimado vs real
-- [ ] Riesgo
-- [ ] Productividad
+- [x] Total de proyectos
+- [x] Proyectos activos
+- [x] Proyectos finalizados
+- [x] Proyectos cancelados
+- [x] Estado por proyecto
+- [x] Tiempo estimado vs real
+- [x] Riesgo
+- [x] Productividad
 
 Exportar
 
-- [ ] PDF
-- [ ] Excel
-- [ ] CSV
+- [x] PDF
+- [x] Excel
+- [x] CSV
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5753,15 +5753,15 @@ Reporte de Clientes
 
 Mostrar
 
-- [ ] Clientes activos
-- [ ] Clientes inactivos
-- [ ] Cantidad de proyectos
-- [ ] Estado general
-- [ ] Última actividad
+- [x] Clientes activos
+- [x] Clientes inactivos
+- [x] Cantidad de proyectos
+- [x] Estado general
+- [x] Última actividad
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5775,14 +5775,14 @@ Reporte de Intermediarios
 
 Mostrar
 
-- [ ] Clientes asignados
-- [ ] Proyectos asignados
-- [ ] Avance promedio
-- [ ] Actividad
+- [x] Clientes asignados
+- [x] Proyectos asignados
+- [x] Avance promedio
+- [x] Actividad
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5796,16 +5796,16 @@ Reporte de Tareas
 
 Mostrar
 
-- [ ] Total de tareas
-- [ ] Completadas
-- [ ] Pendientes
-- [ ] Bloqueadas
-- [ ] Retrasadas
-- [ ] Productividad
+- [x] Total de tareas
+- [x] Completadas
+- [x] Pendientes
+- [x] Bloqueadas
+- [x] Retrasadas
+- [x] Productividad
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5819,14 +5819,14 @@ Reporte de Hitos
 
 Mostrar
 
-- [ ] Hitos completados
-- [ ] Hitos pendientes
-- [ ] Retrasos
-- [ ] Cumplimiento
+- [x] Hitos completados
+- [x] Hitos pendientes
+- [x] Retrasos
+- [x] Cumplimiento
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5840,14 +5840,14 @@ Reporte de Horas
 
 Calcular
 
-- [ ] Horas estimadas
-- [ ] Horas reales
-- [ ] Horas restantes
-- [ ] Desviación
+- [x] Horas estimadas
+- [x] Horas reales
+- [x] Horas restantes
+- [x] Desviación
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5861,15 +5861,15 @@ Reporte de Productividad
 
 Indicadores
 
-- [ ] Proyectos finalizados
-- [ ] Tareas completadas
-- [ ] Horas trabajadas
-- [ ] Cumplimiento de fechas
-- [ ] Tendencias
+- [x] Proyectos finalizados
+- [x] Tareas completadas
+- [x] Horas trabajadas
+- [x] Cumplimiento de fechas
+- [x] Tendencias
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5893,7 +5893,7 @@ Filtrar por
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5907,9 +5907,9 @@ Exportaciones
 
 Permitir exportar
 
-- [ ] PDF
-- [ ] Excel
-- [ ] CSV
+- [x] PDF
+- [x] Excel
+- [x] CSV
 
 Aplicable a
 
@@ -5920,7 +5920,7 @@ Aplicable a
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5934,9 +5934,9 @@ Programación de Reportes
 
 Permitir
 
-- [ ] Generación manual
-- [ ] Generación automática
-- [ ] Programación futura (preparado)
+- [x] Generación manual
+- [ ] Generación automática (roadmap futuro: scheduler externo)
+- [x] Programación futura (preparado)
 
 Estado
 
@@ -5961,7 +5961,7 @@ Mostrar únicamente
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5982,7 +5982,7 @@ Mostrar
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -5996,15 +5996,15 @@ Gráficos
 
 Implementar
 
-- [ ] Barras
-- [ ] Líneas
-- [ ] Pastel
-- [ ] Área
-- [ ] Indicadores KPI
+- [x] Barras
+- [x] Líneas
+- [x] Pastel
+- [x] Área
+- [x] Indicadores KPI
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6024,7 +6024,7 @@ Registrar
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6038,27 +6038,27 @@ Permisos
 
 Developer
 
-- [ ] Todos los reportes
+- [x] Todos los reportes
 
 Intermediary
 
-- [ ] Reportes propios
+- [x] Reportes propios
 
 Client
 
-- [ ] Reportes de sus proyectos
+- [x] Reportes de sus proyectos
 
 Administrator
 
-- [ ] Gestión completa
+- [x] Gestión completa
 
 Super Administrator
 
-- [ ] Acceso completo
+- [x] Acceso completo
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6083,7 +6083,7 @@ Integrar con
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 

@@ -12,7 +12,7 @@ interface ActivityViewProps {
   total: number;
   users: ActivityUserOption[];
   entities: string[];
-  initialFilters: { search: string; user: string; entity: string };
+  initialFilters: { search: string; user: string; entity: string; from: string; to: string };
   view: ViewMode;
   pageIndex: number;
   pageSize: number;
@@ -95,6 +95,30 @@ export function ActivityView({
                 </option>
               ))}
             </select>
+          </div>
+          <div className="w-36">
+            <label htmlFor="activity-from-filter" className="mb-1.5 block text-body-sm font-medium text-body-strong">
+              From
+            </label>
+            <input
+              id="activity-from-filter"
+              type="date"
+              value={initialFilters.from}
+              onChange={(e) => navigate({ from: e.target.value || undefined, page: undefined })}
+              className={selectClasses}
+            />
+          </div>
+          <div className="w-36">
+            <label htmlFor="activity-to-filter" className="mb-1.5 block text-body-sm font-medium text-body-strong">
+              To
+            </label>
+            <input
+              id="activity-to-filter"
+              type="date"
+              value={initialFilters.to}
+              onChange={(e) => navigate({ to: e.target.value || undefined, page: undefined })}
+              className={selectClasses}
+            />
           </div>
         </div>
         <div

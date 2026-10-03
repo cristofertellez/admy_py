@@ -358,3 +358,34 @@ export async function deleteClientCommentAction(commentId: string, clientId: str
     return { error: err instanceof Error ? err.message : "Failed to delete comment." };
   }
 }
+
+// ============================================================
+// Comment restore (Historia 9.10)
+// ============================================================
+
+export async function restoreCommentAction(entityType: string, commentId: string) {
+  try {
+    const actor = await getUser();
+    if (!actor) return { error: "Unauthenticated." };
+
+    if (!["project", "task", "milestone", "client"].includes(entityType)) {
+      return { error: "Invalid comment entity type." };
+    }
+
+    await CommentsService.restoreComment(entityType as "project" | "task" | "milestone" | "client", commentId);
+
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "restored_comment",
+      entity: "Comment",
+      entity_id: commentId,
+      new_value: { entity_type: entityType },
+    });
+
+    revalidatePath(`/dashboard/${entityType}s`, "layout");
+    revalidatePath("/dashboard");
+    return { success: "Comment restored." };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to restore comment." };
+  }
+}
