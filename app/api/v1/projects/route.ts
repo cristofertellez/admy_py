@@ -6,13 +6,14 @@ import {
   isAuthFailure,
   paginatedEnvelope,
   parsePagination,
+  withApiMetrics,
 } from "@/lib/api/public-api";
 import { ProjectsService } from "@/features/projects";
 import type { NextRequest } from "next/server";
 
 // Épica 17 (17.1) — GET /api/v1/projects. Read-only, paginated, filtered by
 // status. Data-layer scopes resolve to the API key owner's visibility.
-export async function GET(request: NextRequest) {
+async function handle(request: NextRequest) {
   const auth = await authenticateApiKey(request);
   if (isAuthFailure(auth)) return auth;
 
@@ -51,3 +52,5 @@ export async function GET(request: NextRequest) {
     return apiError(500, "Failed to list projects.");
   }
 }
+
+export const GET = withApiMetrics("/api/v1/projects", handle);

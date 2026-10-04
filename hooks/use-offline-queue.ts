@@ -48,7 +48,16 @@ interface UseOfflineQueueResult {
   flush: () => Promise<void>;
 }
 
-export function useOfflineQueue(): UseOfflineQueueResult {
+interface UseOfflineQueueOptions {
+  /**
+   * Historia 14.13 — when false (pwa_background_sync disabled), queued
+   * actions are not flushed automatically on reconnection; the user
+   * triggers them manually through the connectivity indicator.
+   */
+  autoSync?: boolean;
+}
+
+export function useOfflineQueue({ autoSync = true }: UseOfflineQueueOptions = {}): UseOfflineQueueResult {
   const queryClient = useQueryClient();
   const [isFlushing, setIsFlushing] = useState(false);
   const [isOnline, setIsOnline] = useState(() => onlineManager.isOnline());
@@ -78,10 +87,13 @@ export function useOfflineQueue(): UseOfflineQueueResult {
     }
   }, [queryClient]);
 
-  // Process queued actions as soon as the connection is restored.
+  // Process queued actions as soon as the connection is restored (unless
+  // background sync is disabled in settings — manual retry then).
   const wasOffline = useRef(!onlineManager.isOnline());
 
   useEffect(() => {
+    if (!autoSync) return;
+
     const unsubscribe = onlineManager.subscribe((online) => {
       if (online && wasOffline.current) {
         wasOffline.current = false;
@@ -96,7 +108,7 @@ export function useOfflineQueue(): UseOfflineQueueResult {
     }
 
     return unsubscribe;
-  }, [flush]);
+  }, [flush, autoSync]);
 
   const enqueue = useCallback(
     (type: PendingActionType, input: FormData | Record<string, string>) => {

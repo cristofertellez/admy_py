@@ -6,13 +6,14 @@ import {
   isAuthFailure,
   paginatedEnvelope,
   parsePagination,
+  withApiMetrics,
 } from "@/lib/api/public-api";
 import { ClientsService } from "@/features/clients";
 import type { NextRequest } from "next/server";
 
 // Épica 17 (17.1) — GET /api/v1/clients. The key owner only receives the
 // clients allowed by their role scope (auth-scope.ts).
-export async function GET(request: NextRequest) {
+async function handle(request: NextRequest) {
   const auth = await authenticateApiKey(request);
   if (isAuthFailure(auth)) return auth;
 
@@ -49,3 +50,5 @@ export async function GET(request: NextRequest) {
     return apiError(500, "Failed to list clients.");
   }
 }
+
+export const GET = withApiMetrics("/api/v1/clients", handle);

@@ -176,6 +176,25 @@ export class ProjectsService {
     };
   }
 
+  /**
+   * Épica 17 (17.10) — resolves a project for CSV imports by name
+   * (case-insensitive, exact match), respecting the caller's scope.
+   */
+  static async findByName(value: string) {
+    const scope = await projectScope("p.id");
+    const needle = value.trim().toLowerCase();
+
+    const project = await queryOne<Record<string, unknown>>(
+      `SELECT p.* FROM projects p
+       WHERE p.deleted_at IS NULL AND LOWER(p.name) = ?
+       ${scope.sql ? `AND ${scope.sql}` : ""}
+       LIMIT 1`,
+      [needle, ...scope.args],
+    );
+
+    return project ? toBoolean(project) : null;
+  }
+
   static async getById(id: string) {
     const project = await queryOne<Record<string, unknown>>(
       `SELECT p.*,
@@ -190,7 +209,7 @@ export class ProjectsService {
       [id],
     );
 
-    if (!project) throw new Error("Project not found.");
+        if (!project) throw new Error("Project not found.");
     await assertProjectVisible(id);
 
     const tags = await TagsService.listByProject(id);

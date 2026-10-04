@@ -1,6 +1,7 @@
 import { newId, query } from "@/lib/turso/client";
 import { NotificationsService } from "@/features/notifications";
 import { WebhooksService } from "@/features/webhooks/webhooks.service";
+import { ActivityService } from "@/services/activity.service";
 import type { SystemEvent } from "@/lib/events/bus";
 
 // Épica 17 (17.6) — automation rules. A rule maps one internal event type
@@ -84,6 +85,13 @@ export class AutomationsService {
       try {
         if (rule.action === "webhook_forward") {
           await WebhooksService.dispatchEvent(event);
+          await ActivityService.log({
+            user_id: rule.created_by ?? "",
+            action: "automation_executed",
+            entity: "Automation",
+            entity_id: rule.id,
+            new_value: { rule: rule.name, event: event.type, action: rule.action },
+          });
           continue;
         }
 
@@ -108,6 +116,18 @@ export class AutomationsService {
               }),
             ),
           );
+          await ActivityService.log({
+            user_id: rule.created_by ?? "",
+            action: "automation_executed",
+            entity: "Automation",
+            entity_id: rule.id,
+            new_value: {
+              rule: rule.name,
+              event: event.type,
+              action: rule.action,
+              notified: recipients.length,
+            },
+          });
         }
       } catch (err) {
         console.error("[automations] rule failed:", rule.name, err instanceof Error ? err.message : err);

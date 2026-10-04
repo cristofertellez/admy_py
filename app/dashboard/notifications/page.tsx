@@ -1,4 +1,5 @@
 import { NotificationsService, NOTIFICATION_TYPES } from "@/features/notifications";
+import { ProjectsService } from "@/features/projects";
 import { getUser } from "@/lib/auth";
 import { NotificationsList } from "./notifications-list";
 import { NotificationPreferencesCard } from "./notification-preferences";
@@ -34,6 +35,7 @@ interface NotificationsPageProps {
     search?: string;
     type?: string;
     read?: string;
+    project?: string;
     from?: string;
     to?: string;
     page?: string;
@@ -56,8 +58,16 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
   // generated idempotently on load; dedupe keys prevent duplicates (13.5).
   await NotificationsService.syncTimeBasedNotifications();
 
+  // Historia 13.10 — the project filter is validated against the visible
+  // project options before reaching the service.
+  const projectList = await ProjectsService.list({ pageSize: 200 }).catch(() => ({ data: [], total: 0 }));
+  const projectOptions = projectList.data.map((project) => ({ id: project.id, name: project.name }));
+  const projectId = projectOptions.some((option) => option.id === params.project)
+    ? params.project
+    : undefined;
+
   const [{ data: notifications, total }, stats, preferences] = await Promise.all([
-    NotificationsService.list(user.id, { isRead, type, search, from, to, page, pageSize: PAGE_SIZE }),
+    NotificationsService.list(user.id, { isRead, type, search, projectId, from, to, page, pageSize: PAGE_SIZE }),
     NotificationsService.getStats(user.id),
     NotificationsService.getPreferences(user.id),
   ]);
@@ -88,10 +98,12 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
         page={page}
         totalPages={totalPages}
         typeLabels={TYPE_LABELS}
+        projectOptions={projectOptions}
         initialFilters={{
           search: search ?? "",
           type: type ?? "",
           read: params.read ?? "",
+          project: projectId ?? "",
           from: from ?? "",
           to: to ?? "",
         }}

@@ -174,6 +174,7 @@ Preparación para producción
 - [x] Auditoría: exportación del Activity Log (PDF/CSV/Excel), política de retención con ajuste `audit_retention_days`, filtro de eventos de seguridad, `login_failed`, detalles old→new en la tabla y cierre de auditoría de tareas/hitos (16.4/16.5/16.8/16.11–16.15)
 - [x] PWA: datos locales de recientes con accesos rápidos offline, prompt de actualización ("Update now"/"Remind later") según ajuste `pwa_auto_updates`, jsPDF lazy (menos bundle), categoría de ajustes PWA, auditoría del ciclo PWA vía `/api/pwa/events` y checklist de compatibilidad (14.6/14.9–14.15)
 - [x] Épica 17 — API pública v1 read-only (proyectos/tareas/clientes/hitos + OpenAPI + rate limiting + API keys hasheadas con UI en `/dashboard/integrations`), webhooks firmados con cola de reintentos e historial, bus de eventos internos (`system_events` + `after()`), reglas de automatización, feed ICS de calendario, importación CSV de clientes/proyectos con validación en dos fases, exportación global ZIP, `/api/health` y `docs/ROADMAP.md` (v2–v4)
+- [x] Cierre de pendientes accionables: lockout de cuenta con `login_max_attempts`/`auto_lock_minutes` (migración 00014, 16.13), filtro por proyecto en el Activity Log y en notificaciones (13.7/13.10/16.9), consulta limitada del log para Administrator (16.14), filtro por intermediario en el dashboard (11.12), sincronización en segundo plano desactivable (14.13), importación de tareas/hitos + formato Excel (17.10), auditoría `automation_executed` (17.16), avatares locales con `next/image` (14.10) y métricas de latencia/errores de la API en `/api/health` (17.12)
 
 ---
 
@@ -5519,16 +5520,16 @@ Permitir filtrar por
 
 - [x] Proyecto
 - [x] Cliente
-- [ ] Intermediario
+- [x] Intermediario
 - [x] Fecha
 - [x] Estado
 - [x] Prioridad
 
-Implementación: barra de filtros en el dashboard con estado en URL (`?project&client&status&priority&from&to`) validada contra listas de opciones; `DashboardService` acepta `DashboardFilters` y los aplica a los conteos del scope, tareas vencidas, hitos próximos, riesgo, entregas próximas, comentarios y archivos (fragments `projectFilterFragment`/`taskFilterFragment`, arg-count preservado). El filtro de Cliente se ofrece al Developer; el filtro directo por Intermediario queda pendiente (la cartera del cliente cubre el caso Intermediary).
+Implementación: barra de filtros en el dashboard con estado en URL (`?project&client&intermediary&status&priority&from&to`) validada contra listas de opciones; `DashboardService` acepta `DashboardFilters` y los aplica a los conteos del scope, tareas vencidas, hitos próximos, riesgo, entregas próximas, comentarios y archivos (fragments `projectFilterFragment`/`taskFilterFragment` con subconsultas para cliente e intermediario, arg-count preservado). Los filtros de Cliente e Intermediario se ofrecen al Developer; Client/Intermediary operan naturalmente sobre su cartera.
 
 Estado
 
-In Progress
+Done
 
 Prioridad
 
@@ -6360,15 +6361,15 @@ Mostrar cronológicamente.
 Filtros
 
 - [x] Usuario
-- [ ] Proyecto
+- [x] Proyecto
 - [x] Fecha
 - [x] Tipo de actividad
 
-Implementación: `/dashboard/activity` concentra el registro completo (`ActivityLogService.list`) con vistas Tabla y Timeline, búsqueda de acción/entidad, filtros de usuario/entidad/fecha y detalle de cambios old→new por fila (16.8); el filtro directo por proyecto queda pendiente (el buscador y el filtro por entidad cubren parcialmente el caso). Los eventos de acceso y seguridad se registran con normalización (ACCESS/SECURITY_AUDIT_ACTIONS).
+Implementación: `/dashboard/activity` concentra el registro completo (`ActivityLogService.list`) con vistas Tabla y Timeline, búsqueda de acción/entidad, filtros de usuario/entidad/proyecto/fecha y detalle de cambios old→new por fila (16.8). El filtro por proyecto cubre el propio proyecto más sus tareas e hitos (subconsultas, sin exponer entidades ajenas) y se aplica también a las exportaciones (16.11). Los eventos de acceso y seguridad se registran con normalización (ACCESS/SECURITY_AUDIT_ACTIONS).
 
 Estado
 
-In Progress
+Done
 
 Prioridad
 
@@ -6429,16 +6430,16 @@ Búsqueda
 Buscar notificaciones por.
 
 - [x] Texto
-- [ ] Proyecto
+- [x] Proyecto
 - [x] Usuario
 - [x] Fecha
 - [x] Tipo
 
-Implementación: `NotificationsService.list` soporta búsqueda LIKE sobre título y mensaje, filtro por tipo, estado de lectura y rango de fechas (`from`/`to`), expuestos en el centro de notificaciones con estado en URL. "Usuario" es implícito (cada usuario solo ve sus notificaciones); el filtro por proyecto queda pendiente.
+Implementación: `NotificationsService.list` soporta búsqueda LIKE sobre título y mensaje, filtro por tipo, estado de lectura, rango de fechas (`from`/`to`) y filtro por proyecto (notificaciones de proyecto, tareas e hitos del proyecto vía subconsultas), todo expuesto en el centro de notificaciones con estado en URL. "Usuario" es implícito: cada usuario solo ve sus notificaciones (los UPDATE/SELECT aplican `receiver_id`).
 
 Estado
 
-In Progress
+Done
 
 Prioridad
 
@@ -6938,13 +6939,13 @@ Optimizar
 - [x] Code Splitting
 - [x] Prefetch
 - [x] Precarga de recursos
-- [ ] Imágenes optimizadas
+- [x] Imágenes optimizadas
 
-Implementación: jsPDF/jspdf-autotable (la dependencia más pesada del cliente) se cargan on demand dentro de `exportReportPdf`; los componentes pesados (Kanban, gráficos) se trocean por ruta en el build; Next.js prefetchea los `<Link>` del sidebar por defecto; el Service Worker precachea offline/manifest/iconos y sirve estáticos cache-first. Pendiente: migrar `<img>` (avatars, vista previa de archivos) a `next/image`.
+Implementación: jsPDF/jspdf-autotable (la dependencia más pesada del cliente) se cargan on demand dentro de `exportReportPdf`; los componentes pesados (Kanban, gráficos) se trocean por ruta en el build; Next.js prefetchea los `<Link>` del sidebar por defecto; el Service Worker precachea offline/manifest/iconos y sirve estáticos cache-first. Imágenes: los avatares con ruta local (`/api/avatars/...`) usan `next/image`; las URLs firmadas remotas y las vistas previas (blob/presigned de un uso) mantienen `<img>` deliberadamente — el optimizador no puede re-fetchearlas y `remotePatterns` con URLs de sesión no es viable.
 
 Estado
 
-In Progress
+Done
 
 Prioridad
 
@@ -7020,7 +7021,7 @@ Permitir configurar
 - [x] Notificaciones
 - [x] Sincronización
 
-Implementación: nueva categoría "Progressive Web App" en Ajustes con `pwa_auto_updates` (aplicado en el flujo de actualización del SW, 14.9), `pwa_offline_cache`, `pwa_background_sync` y `pwa_notification...` vía preferencias de usuario (13.6). Nota: offline cache y background sync están documentados como flags operativos; el SW siempre cachea páginas visitadas y la cola se sincroniza al reconectar, de modo que su aplicación estricta (desactivar caché/sync) queda como refinamiento pendiente junto al presupuesto de uso de datos.
+Implementación: categoría "Progressive Web App" en Ajustes — `pwa_auto_updates` aplica en el flujo de actualización del SW (14.9), `pwa_background_sync` desactiva la sincronización automática de la cola al reconectar (solo reintento manual vía el indicador de conectividad, respetado desde el layout del dashboard) y las notificaciones se configuran en las preferencias de usuario (13.6). El flag `pwa_offline_cache` queda documentado como operativo (el SW siempre cachea páginas visitadas; desactivarlo por completo exige lógica de bypass en el SW) y el presupuesto de uso de datos sigue pendiente.
 
 Estado
 
@@ -7783,7 +7784,7 @@ Permitir filtrar por
 - Proyecto
 - Cliente
 
-Implementación parcial: filtros por usuario, entidad y búsqueda de acción en `/dashboard/activity`; fecha, proyecto y cliente pendientes.
+Implementación: filtros por usuario, entidad (módulo/tipo de recurso), búsqueda de acción (LIKE), rango de fechas y proyecto (proyecto + sus tareas e hitos vía subconsultas) en `/dashboard/activity`; el filtro directo por cliente queda pendiente (cubierto parcialmente por el filtro de entidad).
 
 Estado
 
@@ -7873,14 +7874,14 @@ Registrar
 - [x] Accesos denegados
 - [x] Errores de permisos
 - [x] Intentos sospechosos
-- [ ] Bloqueos de cuenta
+- [x] Bloqueos de cuenta
 - [x] Cambios críticos
 
-Implementación: `access_denied` en cada denegación de la capa de datos (auth-scope) y `login_failed` en credenciales inválidas (email registrado, sin contraste); cambios críticos = `changed_password`, `changed_role`, `updated_permissions` y eventos de configuración. `SECURITY_AUDIT_ACTIONS` + el filtro "Security events only" del Activity Log aísla la vista forense. Pendiente: bloqueo de cuenta tras intentos fallidos (el ajuste `login_max_attempts` existe; la aplicación del lockout queda para seguridad v1.1).
+Implementación: `access_denied` en cada denegación de la capa de datos (auth-scope) y `login_failed` en credenciales inválidas (email registrado, sin contraste); cambios críticos = `changed_password`, `changed_role`, `updated_permissions` y eventos de configuración. Bloqueo de cuenta (migración 00014): el proveedor de credenciales cuenta intentos fallidos por usuario y aplica un lockout temporal según `login_max_attempts`/`auto_lock_minutes` (auditado como `account_locked`, contador reseteado y desbloqueado en el siguiente login válido; el formulario informa la hora de desbloqueo). `SECURITY_AUDIT_ACTIONS` + el filtro "Security events only" del Activity Log aísla la vista forense.
 
 Estado
 
-In Progress
+Done
 
 Prioridad
 
@@ -7894,7 +7895,7 @@ Permisos
 
 Developer
 
-- Sin acceso
+- [ ] Sin acceso
 
 Intermediary
 
@@ -7906,12 +7907,12 @@ Client
 
 Administrator
 
-- [ ] Consulta limitada
+- [x] Consulta limitada
 
 Super Administrator
 - [x] Acceso completo
 
-Implementación: el Activity Log exige `users.read` y su ruta es admin-only (`ADMIN_ONLY_ROUTES` en `lib/routes.ts`), de modo que Client e Intermediary jamás acceden (UI y URL directa). Nota de arquitectura: el RBAC del proyecto (Historia 6.18/PRD) otorga a Developer el comodín `*` y no incluye `users.*` en Administrator — por tanto Developer mantiene acceso completo de diagnóstico y Administrator no consulta el log global; alinear la matriz exacta de esta historia exigiría cambiar la jerarquía global de permisos (decisión de producto pendiente).
+Implementación: el Activity Log es admin-only (`canAccessRoute`); Administrator accede en modo consulta — ve tabla/timeline/filtros pero no exportaciones (requieren `users.read`) ni dispara la purga de retención (requiere `settings.update`). Client e Intermediary jamás acceden (UI y URL directa). Nota de arquitectura: el RBAC del proyecto (Historia 6.18/PRD) otorga a Developer el comodín `*`, por lo que mantiene acceso completo de diagnóstico — alinear esa fila de la matriz exigiría cambiar la jerarquía global de permisos (decisión de producto pendiente).
 
 Estado
 
@@ -8249,16 +8250,16 @@ Permitir importar
 
 - [x] Clientes
 - [x] Proyectos
+- [x] Tareas
+- [x] Hitos
 - [ ] Usuarios
-- [ ] Tareas
-- [ ] Hitos
 
 Formatos
 
 - [x] CSV
-- [ ] Excel
+- [x] Excel
 
-Implementación: `/dashboard/import` con flujo de dos fases — "Validate" (parser CSV RFC-4180 propio, mapeo de cabeceras por alias, validación Zod por fila y reporte detallado sin escribir) y "Import" que inserta únicamente las filas válidas (clientes, y proyectos que resuelven su cliente por email/empresa vía `findByEmailOrCompany`; ambos con auditoría `imported_data` y publicación del evento interno). Tareas/hitos/usuarios y el formato Excel reutilizan el mismo pipeline cuando se sumen; los tipos de fila y el resolver de proyecto ya están aislados por entidad.
+Implementación: `/dashboard/import` con flujo de dos fases — "Validate" (parser CSV RFC-4180 propio + lectura de hojas .xlsx server-side, mapeo de cabeceras por alias, validación Zod por fila y reporte detallado sin escribir) y "Import" que inserta únicamente las filas válidas: clientes; proyectos que resuelven su cliente por email/empresa (`findByEmailOrCompany`); tareas e hitos que resuelven su proyecto por nombre (`findByName`). Todo con auditoría (`imported_data` + eventos de creación y publicación al bus interno) y permiso por entidad revalidado en cada acción. Importación de usuarios pendiente (requiere política de contraseñas/invitaciones).
 
 Estado
 
@@ -8309,13 +8310,13 @@ Registrar
 
 - [x] Rendimiento
 - [x] Errores
-- [ ] Latencia
+- [x] Latencia
 - [ ] Uso de recursos
 - [x] Disponibilidad
 
 Preparado para futuras herramientas de observabilidad.
 
-Implementación: `/api/health` expone estado (ok/degraded), verificación de base de datos con latencia de la consulta en ms y versión — apto para uptime monitors y balanceadores. Los errores de integración y ejecución quedan en el Activity Log/consola estructurada del servidor. Pendiente: métricas agregadas de latencia por endpoint y uso de recursos (instrumentación OTel/Sentry, planificado en docs/ROADMAP.md).
+Implementación: `/api/health` expone estado (ok/degraded), verificación de base de datos con latencia de la consulta en ms, versión y métricas de la API pública — muestras recientes (ring buffer de 100), errores 4xx/5xx, latencia media y máxima de los últimos 50 requests y uptime del proceso (`lib/monitoring.ts` + `withApiMetrics` envolviendo los handlers de `/api/v1/*`). Los errores de integración y ejecución quedan en el Activity Log/consola estructurada. Pendiente: uso de recursos del runtime y exportación de métricas a OTel/Sentry (planificado en docs/ROADMAP.md).
 
 Estado
 
@@ -8432,14 +8433,14 @@ Registrar
 - [x] Uso de API
 - [x] Creación de API Keys
 - [x] Webhooks enviados
-- [ ] Automatizaciones ejecutadas
+- [x] Automatizaciones ejecutadas
 - [x] Errores de integración
 
-Implementación: `used_api` (por endpoint, con dedupe por ventana), `created_api_key`/`revoked_api_key`/`deleted_api_key`, `created_webhook`/`activated_webhook`/`deactivated_webhook`/`deleted_webhook`, y los errores de entrega quedan persistidos en `webhook_deliveries` (estado HTTP, intentos, error) con visibilidad en la UI de Integraciones. Las entregas por webhook se auditan a través de su historial propio; la auditoría por ejecución de automatización (evento por run) queda pendiente para no duplicar el registro de la notificación resultante.
+Implementación: `used_api` (por endpoint, con dedupe por ventana), `created_api_key`/`revoked_api_key`/`deleted_api_key`, `created_webhook`/`activated_webhook`/`deactivated_webhook`/`deleted_webhook`, `automation_executed` (por ejecución de regla, con evento/acción/notificados) y los errores de entrega persistidos en `webhook_deliveries` (estado HTTP, intentos, error) con visibilidad en la UI de Integraciones. Las entregas de webhook se auditan a través de su historial propio (`webhook_deliveries`).
 
 Estado
 
-In Progress
+Done
 
 Prioridad
 

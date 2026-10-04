@@ -18,12 +18,14 @@ interface DashboardToolbarProps {
   filterOptions: {
     projects: { id: string; name: string }[];
     clients: { id: string; name: string }[];
+    intermediaries: { id: string; name: string }[];
     statuses: { value: string; label: string }[];
     priorities: { value: string; label: string }[];
   };
   initialFilters: {
     project: string;
     client: string;
+    intermediary: string;
     status: string;
     priority: string;
     from: string;
@@ -115,6 +117,7 @@ export function DashboardToolbar({
       const { report, error } = await getDashboardExportReport({
         projectId: initialFilters.project || undefined,
         clientId: initialFilters.client || undefined,
+        intermediaryId: initialFilters.intermediary || undefined,
         status: initialFilters.status || undefined,
         priority: initialFilters.priority || undefined,
         from: initialFilters.from || undefined,
@@ -133,6 +136,7 @@ export function DashboardToolbar({
   const exportQuery = new URLSearchParams();
   if (initialFilters.project) exportQuery.set("project", initialFilters.project);
   if (initialFilters.client) exportQuery.set("client", initialFilters.client);
+  if (initialFilters.intermediary) exportQuery.set("intermediary", initialFilters.intermediary);
   if (initialFilters.status) exportQuery.set("status", initialFilters.status);
   if (initialFilters.priority) exportQuery.set("priority", initialFilters.priority);
   if (initialFilters.from) exportQuery.set("from", initialFilters.from);
@@ -147,6 +151,7 @@ export function DashboardToolbar({
   const hasActiveFilters = Boolean(
     initialFilters.project ||
       initialFilters.client ||
+      initialFilters.intermediary ||
       initialFilters.status ||
       initialFilters.priority ||
       initialFilters.from ||
@@ -228,6 +233,26 @@ export function DashboardToolbar({
               </select>
             </div>
           )}
+          {filterOptions.intermediaries.length > 0 && (
+            <div className="w-full sm:w-48">
+              <label htmlFor="dashboard-intermediary-filter" className="mb-1 block text-caption text-muted">
+                Intermediary
+              </label>
+              <select
+                id="dashboard-intermediary-filter"
+                value={initialFilters.intermediary}
+                onChange={(e) => navigate({ intermediary: e.target.value || undefined })}
+                className={selectClasses}
+              >
+                <option value="">All intermediaries</option>
+                {filterOptions.intermediaries.map((intermediary) => (
+                  <option key={intermediary.id} value={intermediary.id}>
+                    {intermediary.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="w-full sm:w-40">
             <label htmlFor="dashboard-status-filter" className="mb-1 block text-caption text-muted">
               Project status
@@ -292,7 +317,17 @@ export function DashboardToolbar({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate({ project: undefined, client: undefined, status: undefined, priority: undefined, from: undefined, to: undefined })}
+              onClick={() =>
+                navigate({
+                  project: undefined,
+                  client: undefined,
+                  intermediary: undefined,
+                  status: undefined,
+                  priority: undefined,
+                  from: undefined,
+                  to: undefined,
+                })
+              }
             >
               Clear
             </Button>

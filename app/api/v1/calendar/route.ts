@@ -1,5 +1,5 @@
 import { withActor } from "@/lib/api/actor-context";
-import { authenticateApiKey, isAuthFailure, apiError } from "@/lib/api/public-api";
+import { authenticateApiKey, isAuthFailure, apiError, withApiMetrics } from "@/lib/api/public-api";
 import { MilestonesService } from "@/features/milestones";
 import { query } from "@/lib/turso/client";
 import { projectScope } from "@/lib/auth-scope";
@@ -39,7 +39,7 @@ function buildVEvent(input: {
   ];
 }
 
-export async function GET(request: NextRequest) {
+async function handle(request: NextRequest) {
   const auth = await authenticateApiKey(request);
   if (isAuthFailure(auth)) return auth;
 
@@ -105,3 +105,5 @@ export async function GET(request: NextRequest) {
     return apiError(500, "Failed to build calendar feed.");
   }
 }
+
+export const GET = withApiMetrics("/api/v1/calendar", handle);

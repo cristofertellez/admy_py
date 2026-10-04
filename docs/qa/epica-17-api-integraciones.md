@@ -48,8 +48,20 @@ exportación global (17.11) y health check (17.12).
   solo las válidas y audita `imported_data` + publica `client.created`.
 - CSV de proyectos resuelve el cliente por email o empresa; cliente
   inexistente → error de fila con instrucción.
+- Tareas (cabecera `project,title,status,priority,estimated_hours,due_date`)
+  e hitos (`project,title,estimated_date,status`) resuelven su proyecto por
+  nombre exacto (case-insensitive); proyecto inexistente → error de fila.
+- Archivos `.xlsx` (primera hoja) siguen el mismo pipeline de validación;
+  el parseo ocurre en el servidor (xlsx), sin peso extra en el cliente.
 - `GET /api/export/global` (Developer/Super Administrator) devuelve ZIP
   con clients/projects/tasks/milestones/activity-log/settings.csv y
   audita `exported_globals`; roles inferiores reciben 403.
-- `GET /api/health` responde `{status, checks.database, latencyMs}` y 503
-  si la base de datos no responde.
+- `GET /api/health` responde `{status, checks.database, latencyMs, api{...}}`
+  y 503 si la base de datos no responde; la sección `api` muestra las
+  muestras de latencia/errores de `/api/v1/*` (`withApiMetrics`).
+
+## Automatizaciones (17.16)
+
+- Cada ejecución de regla registra `automation_executed` en el Activity Log
+  (regla, evento, acción y notificados); las ejecuciones fallidas quedan
+  en consola del servidor sin romper la mutación original.

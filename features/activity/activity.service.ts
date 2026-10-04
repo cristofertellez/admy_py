@@ -15,7 +15,10 @@ const ACTIVITY_SELECT = `
 const SORTABLE_COLUMNS = new Set(["created_at", "action", "entity"]);
 
 function buildWhere(
-  filters: Pick<ActivityLogFilters, "search" | "userId" | "entity" | "entityId" | "actions" | "dateFrom" | "dateTo">,
+  filters: Pick<
+    ActivityLogFilters,
+    "search" | "userId" | "entity" | "entityId" | "projectId" | "actions" | "dateFrom" | "dateTo"
+  >,
 ) {
   const conditions: string[] = [];
   const args: InValue[] = [];
@@ -36,6 +39,16 @@ function buildWhere(
   if (filters.entityId) {
     conditions.push("al.entity_id = ?");
     args.push(filters.entityId);
+  }
+  if (filters.projectId) {
+    // Historia 13.7/16.9 — the project filter covers the project itself and
+    // its tasks and milestones, without exposing out-of-scope entities.
+    conditions.push(
+      `(al.entity = 'Project' AND al.entity_id = ?
+        OR al.entity_id IN (SELECT id FROM tasks WHERE project_id = ? AND deleted_at IS NULL)
+        OR al.entity_id IN (SELECT id FROM milestones WHERE project_id = ? AND deleted_at IS NULL))`,
+    );
+    args.push(filters.projectId, filters.projectId, filters.projectId);
   }
   if (filters.actions && filters.actions.length > 0) {
     conditions.push(`al.action IN (${filters.actions.map(() => "?").join(", ")})`);
@@ -61,6 +74,7 @@ export class ActivityLogService {
       userId,
       entity,
       entityId,
+      projectId,
       actions,
       dateFrom,
       dateTo,
@@ -70,7 +84,7 @@ export class ActivityLogService {
       sortOrder = "desc",
     } = filters;
 
-    const { whereSql, args } = buildWhere({ search, userId, entity, entityId, actions, dateFrom, dateTo });
+    const { whereSql, args } = buildWhere({ search, userId, entity, entityId, projectId, actions, dateFrom, dateTo });
     const orderColumn = SORTABLE_COLUMNS.has(sortBy) ? sortBy : "created_at";
     const direction = sortOrder === "asc" ? "ASC" : "DESC";
     const offset = (page - 1) * pageSize;
@@ -112,6 +126,7 @@ export class ActivityLogService {
       userId,
       entity,
       entityId,
+      projectId,
       actions,
       dateFrom,
       dateTo,
@@ -119,7 +134,7 @@ export class ActivityLogService {
       sortOrder = "desc",
     } = filters;
 
-    const { whereSql, args } = buildWhere({ search, userId, entity, entityId, actions, dateFrom, dateTo });
+    const { whereSql, args } = buildWhere({ search, userId, entity, entityId, projectId, actions, dateFrom, dateTo });
     const orderColumn = SORTABLE_COLUMNS.has(sortBy) ? sortBy : "created_at";
     const direction = sortOrder === "asc" ? "ASC" : "DESC";
 

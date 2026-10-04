@@ -17,6 +17,7 @@ export interface ActivityLogFilters {
   userId?: string;
   entity?: string;
   entityId?: string;
+  projectId?: string;
   actions?: string[];
   dateFrom?: string;
   dateTo?: string;

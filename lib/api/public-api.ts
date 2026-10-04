@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ApiKeysService } from "@/features/api-keys";
 import { ActivityService } from "@/services/activity.service";
+import { recordApiRequest } from "@/lib/monitoring";
 import type { SessionProfile } from "@/lib/auth";
 import type { ApiKeyScope } from "@/features/api-keys";
 
@@ -102,4 +103,27 @@ export function parsePagination(url: URL): { page: number; pageSize: number } {
   const pageSizeRaw = Number.parseInt(url.searchParams.get("pageSize") || "20", 10) || 20;
   const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
   return { page, pageSize };
+}
+
+/**
+ * Épica 17 (17.12) — wraps a public API route handler with latency/error
+ * metrics for /api/health. The wrapper is transparent for the handler and
+ * preserves its exact signature (including NextRequest and dynamic
+ * context params).
+ */
+export function withApiMetrics<Args extends unknown[], R extends Response>(
+  endpoint: string,
+  handler: (...args: Args) => Promise<R>,
+): (...args: Args) => Promise<R> {
+  return async (...args) => {
+    const startedAt = Date.now();
+    try {
+      const response = await handler(...args);
+      recordApiRequest(endpoint, Date.now() - startedAt, response.status);
+      return response;
+    } catch (err) {
+      recordApiRequest(endpoint, Date.now() - startedAt, 500);
+      throw err;
+    }
+  };
 }

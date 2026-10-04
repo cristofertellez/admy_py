@@ -1,41 +1,60 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { previewCsvImport, commitCsvImport, type ImportEntity, type ImportPreviewResult, type ImportCommitResult } from "@/actions/import";
+import {
+  previewImport,
+  commitImport,
+  type ImportEntity,
+  type ImportPreviewResult,
+  type ImportCommitResult,
+} from "@/actions/import";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shared/card";
 import { Badge } from "@/components/shared/badge";
 import { Button } from "@/components/ui/button";
 
 const SAMPLE_CSV: Record<ImportEntity, string> = {
   clients: "company_name,contact_name,email,phone,status\nAcme Corp,Jane Doe,jane@acme.com,+1 555 0100,active",
-  projects: "name,client,status,priority,estimated_hours,estimated_start,estimated_end\nNew website,Acme Corp,In Progress,High,80,2026-01-05,2026-03-01",
+  projects:
+    "name,client,status,priority,estimated_hours,estimated_start,estimated_end\nNew website,Acme Corp,In Progress,High,80,2026-01-05,2026-03-01",
+  tasks: "project,title,status,priority,estimated_hours,due_date\nNew website,Design mockups,Pending,High,12,2026-01-20",
+  milestones: "project,title,estimated_date,status\nNew website,Visual design approved,2026-01-25,Pending",
+};
+
+const HEADERS: Record<ImportEntity, string> = {
+  clients: "company_name,contact_name,email,phone,status",
+  projects: "name,client,status,priority,estimated_hours,estimated_start,estimated_end",
+  tasks: "project,title,status,priority,estimated_hours,due_date",
+  milestones: "project,title,estimated_date,status",
 };
 
 /**
- * Épica 17 (17.10) — two-phase CSV import: dry-run validation report and
- * a commit step that inserts only the valid rows.
+ * Épica 17 (17.10) — two-phase data import: dry-run validation report and
+ * a commit step that inserts only the valid rows. Sources: pasted CSV text
+ * or an uploaded .csv / .xlsx file (parsed server-side).
  */
 export function ImportView() {
   const [entity, setEntity] = useState<ImportEntity>("clients");
   const [csv, setCsv] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
   const [commitResult, setCommitResult] = useState<ImportCommitResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function handleFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      setCsv(String(reader.result ?? ""));
-      setPreview(null);
-      setCommitResult(null);
-    };
-    reader.readAsText(file);
+  function resetResults() {
+    setPreview(null);
+    setCommitResult(null);
+  }
+
+  function handleFile(next: File | null) {
+    setFile(next);
+    setCsv("");
+    resetResults();
   }
 
   function handlePreview() {
     startTransition(async () => {
-      const result = await previewCsvImport(entity, csv);
+      const result = await previewImport(entity, file ?? csv);
       if ("error" in result) {
         setError(result.error);
         setPreview(null);
@@ -49,7 +68,7 @@ export function ImportView() {
 
   function handleCommit() {
     startTransition(async () => {
-      const result = await commitCsvImport(entity, csv);
+      const result = await commitImport(entity, file ?? csv);
       if ("error" in result) {
         setError(result.error);
         return;
@@ -62,10 +81,12 @@ export function ImportView() {
   const inputClasses =
     "h-10 w-full rounded-md border border-hairline bg-surface-card px-3 py-2 text-body-sm text-body-strong focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent";
 
+  const hasSource = file !== null || csv.trim().length > 0;
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
-        <CardHeader><CardTitle>1. Upload CSV</CardTitle></CardHeader>
+        <CardHeader><CardTitle>1. Upload data</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div>
             <label htmlFor="import-entity" className="mb-1 block text-caption text-muted">
@@ -76,37 +97,46 @@ export function ImportView() {
               value={entity}
               onChange={(e) => {
                 setEntity(e.target.value as ImportEntity);
-                setPreview(null);
-                setCommitResult(null);
+                handleFile(null);
               }}
               className={inputClasses}
             >
               <option value="clients">Clients</option>
               <option value="projects">Projects (requires existing clients)</option>
+              <option value="tasks">Tasks (requires existing projects)</option>
+              <option value="milestones">Milestones (requires existing projects)</option>
             </select>
           </div>
 
           <div>
             <label htmlFor="import-file" className="mb-1 block text-caption text-muted">
-              CSV file
+              CSV or Excel file
             </label>
             <input
               id="import-file"
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,.xlsx,text/csv"
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFile(file);
+                const next = e.target.files?.[0] ?? null;
+                if (next) handleFile(next);
               }}
               className="text-body-sm text-muted"
             />
+            {file && (
+              <p className="mt-1 text-caption text-body-strong">
+                {file.name} ({Math.max(1, Math.round(file.size / 1024))} KB)
+                <button
+                  type="button"
+                  onClick={() => handleFile(null)}
+                  className="ml-2 text-primary hover:underline"
+                >
+                  Remove
+                </button>
+              </p>
+            )}
             <p className="mt-1 text-caption text-muted">
               Expected header:{" "}
-              <code className="text-body-strong">
-                {entity === "clients"
-                  ? "company_name,contact_name,email,phone,status"
-                  : "name,client,status,priority,estimated_hours,estimated_start,estimated_end"}
-              </code>
+              <code className="text-body-strong">{HEADERS[entity]}</code>
             </p>
           </div>
 
@@ -119,8 +149,8 @@ export function ImportView() {
               value={csv}
               onChange={(e) => {
                 setCsv(e.target.value);
-                setPreview(null);
-                setCommitResult(null);
+                setFile(null);
+                resetResults();
               }}
               rows={8}
               className="w-full rounded-md border border-hairline bg-surface-card p-3 font-mono text-caption text-body-strong focus:outline-none focus:ring-2 focus:ring-primary"
@@ -129,7 +159,7 @@ export function ImportView() {
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={handlePreview} disabled={isPending || csv.trim().length === 0}>
+            <Button onClick={handlePreview} disabled={isPending || !hasSource}>
               {isPending ? "Working…" : "Validate"}
             </Button>
             {preview && preview.validCount > 0 && (
@@ -151,7 +181,7 @@ export function ImportView() {
         <CardContent className="space-y-3">
           {!preview && !commitResult && (
             <p className="text-body-sm text-muted-soft">
-              Nothing validated yet. Upload or paste a CSV and press Validate.
+              Nothing validated yet. Upload or paste data and press Validate.
             </p>
           )}
 
@@ -184,8 +214,7 @@ export function ImportView() {
                 {commitResult.skipped > 0 && <Badge variant="error">{commitResult.skipped} skipped</Badge>}
               </div>
               <p className="text-body-sm text-muted">
-                Import finished. The created records appear in {entity === "clients" ? "Clients" : "Projects"} with
-                full audit history.
+                Import finished. The created records appear in their module with full audit history.
               </p>
               {commitResult.errors.length > 0 && (
                 <ul className="max-h-60 space-y-1 overflow-y-auto">

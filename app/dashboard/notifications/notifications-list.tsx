@@ -32,7 +32,8 @@ interface NotificationsListProps {
   page: number;
   totalPages: number;
   typeLabels: Record<string, string>;
-  initialFilters: { search: string; type: string; read: string; from: string; to: string };
+  projectOptions: { id: string; name: string }[];
+  initialFilters: { search: string; type: string; read: string; project: string; from: string; to: string };
 }
 
 const TYPE_VARIANTS: Record<string, "default" | "success" | "error" | "warning"> = {
@@ -91,6 +92,7 @@ export function NotificationsList({
   page,
   totalPages,
   typeLabels,
+  projectOptions,
   initialFilters,
 }: NotificationsListProps) {
   const router = useRouter();
@@ -168,6 +170,24 @@ export function NotificationsList({
             {Object.entries(typeLabels).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="w-full sm:w-52">
+          <label htmlFor="notification-project-filter" className="sr-only">
+            Filter by project
+          </label>
+          <select
+            id="notification-project-filter"
+            value={initialFilters.project}
+            onChange={(e) => navigate({ project: e.target.value || undefined, page: undefined })}
+            className={selectClasses}
+          >
+            <option value="">All projects</option>
+            {projectOptions.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
               </option>
             ))}
           </select>

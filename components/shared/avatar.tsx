@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface UserAvatarProps {
   name: string;
@@ -36,8 +37,19 @@ export function UserAvatar({ name, src, size = 64, className }: UserAvatarProps)
       style={{ width: size, height: size }}
     >
       {resolvedSrc ? (
-        // eslint-disable-next-line @next/next/no-img-element -- dynamic signed URLs are incompatible with next/image config
-        <img src={resolvedSrc} alt={name} className="h-full w-full object-cover" />
+        resolvedSrc.startsWith("/") ? (
+          // Historia 14.10 — local avatar paths go through next/image.
+          <Image
+            src={resolvedSrc}
+            alt={name}
+            width={size}
+            height={size}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element -- remote signed URLs are incompatible with next/image config
+          <img src={resolvedSrc} alt={name} className="h-full w-full object-cover" />
+        )
       ) : (
         <span aria-hidden="true">{getInitials(name)}</span>
       )}

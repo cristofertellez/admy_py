@@ -6,13 +6,14 @@ import {
   isAuthFailure,
   paginatedEnvelope,
   parsePagination,
+  withApiMetrics,
 } from "@/lib/api/public-api";
 import { TasksService } from "@/features/tasks";
 import type { NextRequest } from "next/server";
 
 // Épica 17 (17.1) — GET /api/v1/tasks. Filters: status, priority, assignee,
 // project and free search; standard pagination envelope.
-export async function GET(request: NextRequest) {
+async function handle(request: NextRequest) {
   const auth = await authenticateApiKey(request);
   if (isAuthFailure(auth)) return auth;
 
@@ -52,3 +53,5 @@ export async function GET(request: NextRequest) {
     return apiError(500, "Failed to list tasks.");
   }
 }
+
+export const GET = withApiMetrics("/api/v1/tasks", handle);

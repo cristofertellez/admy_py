@@ -4,13 +4,14 @@ import {
   auditApiUsage,
   authenticateApiKey,
   isAuthFailure,
+  withApiMetrics,
 } from "@/lib/api/public-api";
 import { MilestonesService } from "@/features/milestones";
 import type { NextRequest } from "next/server";
 
 // Épica 17 (17.1) — GET /api/v1/milestones?project={id} (project is
 // required so the response stays bounded and scope-verifiable).
-export async function GET(request: NextRequest) {
+async function handle(request: NextRequest) {
   const auth = await authenticateApiKey(request);
   if (isAuthFailure(auth)) return auth;
 
@@ -47,3 +48,5 @@ export async function GET(request: NextRequest) {
     return apiError(500, "Failed to list milestones.");
   }
 }
+
+export const GET = withApiMetrics("/api/v1/milestones", handle);

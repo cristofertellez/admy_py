@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   const filters: DashboardFilters = {
     projectId: url.searchParams.get("project") || undefined,
     clientId: url.searchParams.get("client") || undefined,
+    intermediaryId: url.searchParams.get("intermediary") || undefined,
     status: url.searchParams.get("status") || undefined,
     priority: url.searchParams.get("priority") || undefined,
     from: url.searchParams.get("from") || undefined,

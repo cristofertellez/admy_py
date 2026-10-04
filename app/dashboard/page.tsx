@@ -3,6 +3,7 @@ import { DashboardService, type DashboardFilters } from "@/features/dashboard";
 import { NotificationsService } from "@/features/notifications";
 import { ProjectsService } from "@/features/projects";
 import { ClientsService } from "@/features/clients";
+import { IntermediariesService } from "@/features/intermediaries";
 import { PreferencesService } from "@/features/preferences";
 import { getCatalogOptions } from "@/features/settings";
 import { PROJECT_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants";
@@ -32,6 +33,7 @@ interface DashboardPageProps {
   searchParams: Promise<{
     project?: string;
     client?: string;
+    intermediary?: string;
     status?: string;
     priority?: string;
     from?: string;
@@ -62,24 +64,33 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const panelId: DashboardPanelId =
     user.role === "Intermediary" ? "intermediary" : user.role === "Client" ? "client" : "developer";
 
-  const [projectList, clientList, statusOptions, priorityOptions, preferences] = await Promise.all([
-    ProjectsService.list({ pageSize: PROJECT_OPTIONS_LIMIT }).catch(() => ({ data: [], total: 0 })),
-    ClientsService.list({ pageSize: PROJECT_OPTIONS_LIMIT }).catch(() => ({ data: [], total: 0 })),
-    getCatalogOptions("project_statuses", PROJECT_STATUS_OPTIONS).catch(() => PROJECT_STATUS_OPTIONS),
-    getCatalogOptions("task_priorities", TASK_PRIORITY_OPTIONS).catch(() => TASK_PRIORITY_OPTIONS),
-    PreferencesService.get(user.id).catch(() => null),
-  ]);
+  const [projectList, clientList, intermediaryList, statusOptions, priorityOptions, preferences] =
+    await Promise.all([
+      ProjectsService.list({ pageSize: PROJECT_OPTIONS_LIMIT }).catch(() => ({ data: [], total: 0 })),
+      ClientsService.list({ pageSize: PROJECT_OPTIONS_LIMIT }).catch(() => ({ data: [], total: 0 })),
+      IntermediariesService.list({ pageSize: PROJECT_OPTIONS_LIMIT }).catch(() => ({ data: [], total: 0 })),
+      getCatalogOptions("project_statuses", PROJECT_STATUS_OPTIONS).catch(() => PROJECT_STATUS_OPTIONS),
+      getCatalogOptions("task_priorities", TASK_PRIORITY_OPTIONS).catch(() => TASK_PRIORITY_OPTIONS),
+      PreferencesService.get(user.id).catch(() => null),
+    ]);
 
   const projectOptions = projectList.data.map((project) => ({ id: project.id, name: project.name }));
   const clientOptions = clientList.data.map((client) => ({
     id: client.id,
     name: client.company_name ?? client.contact_name,
   }));
+  const intermediaryOptions = intermediaryList.data.map((intermediary) => ({
+    id: intermediary.id,
+    name: `${intermediary.first_name ?? ""} ${intermediary.last_name ?? ""}`.trim() || intermediary.email,
+  }));
 
   // URL filters are validated against the option lists (Historia 11.12).
   const filters: DashboardFilters = {
     projectId: projectOptions.some((option) => option.id === params.project) ? params.project : undefined,
     clientId: clientOptions.some((option) => option.id === params.client) ? params.client : undefined,
+    intermediaryId: intermediaryOptions.some((option) => option.id === params.intermediary)
+      ? params.intermediary
+      : undefined,
     status: statusOptions.some((option) => option.value === params.status) ? params.status : undefined,
     priority: priorityOptions.some((option) => option.value === params.priority) ? params.priority : undefined,
     from: params.from && /^\d{4}-\d{2}-\d{2}$/.test(params.from) ? params.from : undefined,
@@ -98,12 +109,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       filterOptions={{
         projects: projectOptions,
         clients: panelId === "developer" ? clientOptions : [],
+        intermediaries: panelId === "developer" ? intermediaryOptions : [],
         statuses: statusOptions,
         priorities: priorityOptions,
       }}
       initialFilters={{
         project: filters.projectId ?? "",
         client: filters.clientId ?? "",
+        intermediary: filters.intermediaryId ?? "",
         status: filters.status ?? "",
         priority: filters.priority ?? "",
         from: filters.from ?? "",

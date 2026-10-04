@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     search: url.searchParams.get("search") || undefined,
     userId: url.searchParams.get("user") || undefined,
     entity: url.searchParams.get("entity") || undefined,
+    projectId: url.searchParams.get("project") || undefined,
     dateFrom: url.searchParams.get("from") || undefined,
     dateTo: url.searchParams.get("to") || undefined,
   };

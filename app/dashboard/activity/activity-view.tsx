@@ -14,9 +14,11 @@ interface ActivityViewProps {
   total: number;
   users: ActivityUserOption[];
   entities: string[];
-  initialFilters: { search: string; user: string; entity: string; from: string; to: string };
+  projectOptions: { id: string; name: string }[];
+  initialFilters: { search: string; user: string; entity: string; project: string; from: string; to: string };
   view: ViewMode;
   securityOnly: boolean;
+  canExport: boolean;
   pageIndex: number;
   pageSize: number;
 }
@@ -26,9 +28,11 @@ export function ActivityView({
   total,
   users,
   entities,
+  projectOptions,
   initialFilters,
   view,
   securityOnly,
+  canExport,
   pageIndex,
   pageSize,
 }: ActivityViewProps) {
@@ -101,6 +105,24 @@ export function ActivityView({
               ))}
             </select>
           </div>
+          <div className="w-52">
+            <label htmlFor="activity-project-filter" className="mb-1.5 block text-body-sm font-medium text-body-strong">
+              Project
+            </label>
+            <select
+              id="activity-project-filter"
+              value={initialFilters.project}
+              onChange={(e) => navigate({ project: e.target.value || undefined, page: undefined })}
+              className={selectClasses}
+            >
+              <option value="">All projects</option>
+              {projectOptions.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="w-36">
             <label htmlFor="activity-from-filter" className="mb-1.5 block text-body-sm font-medium text-body-strong">
               From
@@ -166,40 +188,45 @@ export function ActivityView({
         </label>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={exporting}
-            onClick={() => {
-              setExporting(true);
-              startTransition(async () => {
-                const { report, error } = await getActivityExportReport({
-                  search: initialFilters.search || undefined,
-                  userId: initialFilters.user || undefined,
-                  entity: initialFilters.entity || undefined,
-                  dateFrom: initialFilters.from || undefined,
-                  dateTo: initialFilters.to || undefined,
-                });
-                setExporting(false);
-                if (error || !report) return;
-                exportReportPdf(report);
-              });
-            }}
-            className="rounded-md border border-hairline bg-surface-card px-3 py-1.5 text-body-sm text-muted hover:text-body-strong disabled:opacity-50"
-          >
-            {exporting ? "Exporting…" : "Export PDF"}
-          </button>
-          <a
-            href={`/api/activity/export?format=csv&${buildExportQuery(initialFilters).toString()}`}
-            className="rounded-md border border-hairline bg-surface-card px-3 py-1.5 text-body-sm text-muted hover:text-body-strong"
-          >
-            CSV
-          </a>
-          <a
-            href={`/api/activity/export?format=xlsx&${buildExportQuery(initialFilters).toString()}`}
-            className="rounded-md border border-hairline bg-surface-card px-3 py-1.5 text-body-sm text-muted hover:text-body-strong"
-          >
-            Excel
-          </a>
+          {canExport && (
+            <>
+              <button
+                type="button"
+                disabled={exporting}
+                onClick={() => {
+                  setExporting(true);
+                  startTransition(async () => {
+                    const { report, error } = await getActivityExportReport({
+                      search: initialFilters.search || undefined,
+                      userId: initialFilters.user || undefined,
+                      entity: initialFilters.entity || undefined,
+                      projectId: initialFilters.project || undefined,
+                      dateFrom: initialFilters.from || undefined,
+                      dateTo: initialFilters.to || undefined,
+                    });
+                    setExporting(false);
+                    if (error || !report) return;
+                    exportReportPdf(report);
+                  });
+                }}
+                className="rounded-md border border-hairline bg-surface-card px-3 py-1.5 text-body-sm text-muted hover:text-body-strong disabled:opacity-50"
+              >
+                {exporting ? "Exporting…" : "Export PDF"}
+              </button>
+              <a
+                href={`/api/activity/export?format=csv&${buildExportQuery(initialFilters).toString()}`}
+                className="rounded-md border border-hairline bg-surface-card px-3 py-1.5 text-body-sm text-muted hover:text-body-strong"
+              >
+                CSV
+              </a>
+              <a
+                href={`/api/activity/export?format=xlsx&${buildExportQuery(initialFilters).toString()}`}
+                className="rounded-md border border-hairline bg-surface-card px-3 py-1.5 text-body-sm text-muted hover:text-body-strong"
+              >
+                Excel
+              </a>
+            </>
+          )}
         </div>
       </div>
 
@@ -234,11 +261,12 @@ function formatUserName(firstName: string, lastName: string): string {
   return [firstName, lastName].filter(Boolean).join(" ");
 }
 
-function buildExportQuery(filters: { search: string; user: string; entity: string; from: string; to: string }) {
+function buildExportQuery(filters: { search: string; user: string; entity: string; project: string; from: string; to: string }) {
   const query = new URLSearchParams();
   if (filters.search) query.set("search", filters.search);
   if (filters.user) query.set("user", filters.user);
   if (filters.entity) query.set("entity", filters.entity);
+  if (filters.project) query.set("project", filters.project);
   if (filters.from) query.set("from", filters.from);
   if (filters.to) query.set("to", filters.to);
   return query;

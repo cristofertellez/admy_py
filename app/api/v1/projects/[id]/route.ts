@@ -5,6 +5,7 @@ import {
   auditApiUsage,
   authenticateApiKey,
   isAuthFailure,
+  withApiMetrics,
 } from "@/lib/api/public-api";
 import { ProjectsService } from "@/features/projects";
 import { TasksService } from "@/features/tasks";
@@ -13,7 +14,7 @@ import type { NextRequest } from "next/server";
 
 // Épica 17 (17.1) — GET /api/v1/projects/{id}: project detail with its
 // latest tasks and milestones. Visibility follows the key owner's scope.
-export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handle(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const auth = await authenticateApiKey(request);
   if (isAuthFailure(auth)) return auth;
 
@@ -53,3 +54,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     return apiError(500, "Failed to load project.");
   }
 }
+
+export const GET = withApiMetrics("/api/v1/projects/{id}", handle);

@@ -10,6 +10,7 @@ import { MilestonesService, type UpcomingMilestone } from "@/features/milestones
 export interface DashboardFilters {
   projectId?: string;
   clientId?: string;
+  intermediaryId?: string;
   status?: string;
   priority?: string;
   from?: string;
@@ -26,6 +27,14 @@ function projectFilterFragment(filters: DashboardFilters, alias = "p"): { sql: s
   if (filters.clientId) {
     parts.push(`${alias}.client_id = ?`);
     args.push(filters.clientId);
+  }
+  if (filters.intermediaryId) {
+    // Subqueries avoid forcing JOINs in every consumer query (11.12).
+    parts.push(
+      `(${alias}.intermediary_id = ? OR ${alias}.client_id IN (
+        SELECT cl.id FROM clients cl WHERE cl.intermediary_id = ? AND cl.deleted_at IS NULL))`,
+    );
+    args.push(filters.intermediaryId, filters.intermediaryId);
   }
   if (filters.status) {
     parts.push(`${alias}.status = ?`);
@@ -48,6 +57,17 @@ function taskFilterFragment(filters: DashboardFilters, alias = "t"): { sql: stri
   if (filters.projectId) {
     parts.push(`${alias}.project_id = ?`);
     args.push(filters.projectId);
+  }
+  if (filters.clientId) {
+    parts.push(`${alias}.project_id IN (SELECT pj.id FROM projects pj WHERE pj.client_id = ? AND pj.deleted_at IS NULL)`);
+    args.push(filters.clientId);
+  }
+  if (filters.intermediaryId) {
+    parts.push(
+      `${alias}.project_id IN (SELECT pj.id FROM projects pj JOIN clients cl ON cl.id = pj.client_id
+        WHERE (pj.intermediary_id = ? OR cl.intermediary_id = ?) AND pj.deleted_at IS NULL)`,
+    );
+    args.push(filters.intermediaryId, filters.intermediaryId);
   }
   if (filters.priority) {
     parts.push(`${alias}.priority = ?`);
@@ -893,10 +913,14 @@ export class DashboardService {
          AND status NOT IN ('Completed', 'Cancelled')
          AND estimated_end IS NOT NULL AND estimated_end < ?
          ${filters.projectId ? "AND project_id = ?" : ""}
+         ${filters.clientId ? "AND project_id IN (SELECT pj.id FROM projects pj WHERE pj.client_id = ? AND pj.deleted_at IS NULL)" : ""}
+         ${filters.intermediaryId ? "AND project_id IN (SELECT pj.id FROM projects pj JOIN clients cl ON cl.id = pj.client_id WHERE (pj.intermediary_id = ? OR cl.intermediary_id = ?) AND pj.deleted_at IS NULL)" : ""}
          ${filters.priority ? "AND priority = ?" : ""}`,
       [
         new Date().toISOString().slice(0, 10),
         ...(filters.projectId ? [filters.projectId] : []),
+        ...(filters.clientId ? [filters.clientId] : []),
+        ...(filters.intermediaryId ? [filters.intermediaryId, filters.intermediaryId] : []),
         ...(filters.priority ? [filters.priority] : []),
       ],
     );

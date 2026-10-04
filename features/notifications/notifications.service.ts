@@ -72,6 +72,7 @@ export interface NotificationListFilters {
   isRead?: boolean;
   type?: string;
   search?: string;
+  projectId?: string;
   from?: string;
   to?: string;
   page?: number;
@@ -138,7 +139,7 @@ export class NotificationsService {
   // ============================================================
 
   static async list(userId: string, filters: NotificationListFilters = {}) {
-    const { isRead, type, search, from, to, page = 1, pageSize = 20 } = filters;
+    const { isRead, type, search, projectId, from, to, page = 1, pageSize = 20 } = filters;
 
     let whereSql = "n.receiver_id = ? AND n.dismissed_at IS NULL";
     const args: InValue[] = [userId];
@@ -155,6 +156,18 @@ export class NotificationsService {
       whereSql += " AND (n.title LIKE ? OR n.message LIKE ?)";
       const pattern = `%${search}%`;
       args.push(pattern, pattern);
+    }
+    if (projectId) {
+      // Historia 13.10 — the project filter covers project, task and
+      // milestone notifications linked to the selected project.
+      whereSql += ` AND (
+        (n.entity_type = 'Project' AND n.entity_id = ?)
+        OR (n.entity_type = 'Task' AND n.entity_id IN (
+          SELECT id FROM tasks WHERE project_id = ? AND deleted_at IS NULL))
+        OR (n.entity_type = 'Milestone' AND n.entity_id IN (
+          SELECT id FROM milestones WHERE project_id = ? AND deleted_at IS NULL))
+      )`;
+      args.push(projectId, projectId, projectId);
     }
     if (from) {
       whereSql += " AND n.created_at >= ?";

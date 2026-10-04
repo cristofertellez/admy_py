@@ -27,6 +27,18 @@ export async function login(_prevState: unknown, formData: FormData) {
     return { error: "Invalid email or password." };
   }
 
+  // Historia 16.13 — friendly feedback for locked accounts (the provider
+  // rejects them anyway, but with a generic message).
+  const lockedUser = await queryOne<{ locked_until: string | null }>(
+    "SELECT locked_until FROM users WHERE lower(email) = lower(?) AND deleted_at IS NULL LIMIT 1",
+    [parsed.data.email],
+  ).catch(() => null);
+  if (lockedUser?.locked_until && lockedUser.locked_until > new Date().toISOString()) {
+    return {
+      error: `Account temporarily locked due to failed attempts. Try again after ${new Date(lockedUser.locked_until).toLocaleTimeString()}.`,
+    };
+  }
+
   try {
     await signIn("credentials", {
       email: parsed.data.email,

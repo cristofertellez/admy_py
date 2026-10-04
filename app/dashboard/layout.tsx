@@ -20,11 +20,14 @@ const DEFAULT_PRIMARY = "#6D28D9";
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth();
 
-  const [primaryRaw, systemMessage, unreadCount] = await Promise.all([
+  const [primaryRaw, systemMessage, unreadCount, backgroundSyncRaw] = await Promise.all([
     SettingsService.getValue("primary_color"),
     SettingsService.getValue("system_message"),
     NotificationsService.getUnreadCount(user.id).catch(() => 0),
+    // Historia 14.13 — pwa_background_sync drives the queue auto-flush.
+    SettingsService.getValue("pwa_background_sync").catch(() => null),
   ]);
+  const backgroundSync = backgroundSyncRaw !== false;
   const primary =
     typeof primaryRaw === "string" && /^#[0-9A-Fa-f]{6}$/.test(primaryRaw) ? primaryRaw : DEFAULT_PRIMARY;
   const announcement = typeof systemMessage === "string" ? systemMessage.trim() : "";
@@ -48,7 +51,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="p-6">{children}</div>
       </main>
       <InstallPrompt />
-      <OfflineSyncManager />
+      <OfflineSyncManager autoSync={backgroundSync} />
     </div>
   );
 }
