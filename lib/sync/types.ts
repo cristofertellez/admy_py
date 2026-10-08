@@ -1,4 +1,4 @@
-export type SyncStatus = "idle" | "syncing" | "synced" | "error";
+type SyncStatus = "idle" | "syncing" | "synced" | "error";
 
 export interface SyncError {
   message: string;

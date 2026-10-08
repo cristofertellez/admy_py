@@ -6,7 +6,6 @@ import { getSyncManager } from "@/lib/sync/sync-manager";
 import type { SyncSnapshot } from "@/lib/sync/types";
 
 export type { SyncSnapshot };
-export type ConnectivityState = SyncSnapshot;
 
 const DEFAULT_SNAPSHOT: SyncSnapshot = {
   isOnline: true,
@@ -21,7 +20,7 @@ function getServerSnapshot(): SyncSnapshot {
   return DEFAULT_SNAPSHOT;
 }
 
-export function useConnectivity(): ConnectivityState & { retrySync: () => void } {
+export function useConnectivity(): SyncSnapshot & { retrySync: () => void } {
   const queryClient: QueryClient = useQueryClient();
   const syncManager = getSyncManager(queryClient);
 

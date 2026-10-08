@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { RecentFileItem } from "@/features/dashboard";
+import { formatDate } from "@/lib/utils";
 import { ListCard } from "./list-card";
 
 // Historia 11.5 — Files Card widget: latest documents shared on the visible
@@ -9,10 +10,6 @@ interface FilesCardProps {
   files: RecentFileItem[];
   title?: string;
   emptyMessage?: string;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString();
 }
 
 export function FilesCard({

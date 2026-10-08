@@ -10,25 +10,6 @@ import {
   type SettingCategoryId,
 } from "@/features/settings/settings.definition";
 
-export async function getSettings() {
-  await requirePermission("settings.read");
-  return SettingsService.getMap();
-}
-
-export async function updateSetting(key: string, value: unknown, description?: string) {
-  const user = await requirePermission("settings.update");
-  const result = await SettingsService.set(key, value, description);
-  await ActivityService.log({
-    user_id: user.id,
-    action: "updated_settings",
-    entity: "Settings",
-    entity_id: key,
-    new_value: { [key]: value },
-  });
-  revalidatePath("/dashboard/settings");
-  return result;
-}
-
 export async function updateSettings(
   categoryId: SettingCategoryId,
   values: Record<string, unknown>,

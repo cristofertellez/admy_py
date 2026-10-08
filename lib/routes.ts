@@ -1,4 +1,4 @@
-export const ADMIN_ONLY_ROUTES = [
+const ADMIN_ONLY_ROUTES = [
   "/dashboard/admin",
   "/dashboard/users",
   "/dashboard/roles",
@@ -9,13 +9,13 @@ export const ADMIN_ONLY_ROUTES = [
   "/dashboard/import",
 ] as const;
 
-export const ADMIN_ROLES = [
+const ADMIN_ROLES = [
   "Developer",
   "Administrator",
   "Super Administrator",
 ] as const;
 
-export function isAdminRoute(pathname: string): boolean {
+function isAdminRoute(pathname: string): boolean {
   return ADMIN_ONLY_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );

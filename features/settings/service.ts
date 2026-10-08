@@ -1,7 +1,7 @@
 import { newId, query, queryOne } from "@/lib/turso/client";
 import { getSettingDefault } from "./settings.definition";
 
-export interface SettingRecord {
+interface SettingRecord {
   id: string;
   key: string;
   value: unknown;

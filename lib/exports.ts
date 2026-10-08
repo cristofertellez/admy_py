@@ -12,7 +12,7 @@ export function sanitizeFileSegment(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "report";
 }
 
-export function reportToRows(report: ModuleReport): (string | number)[][] {
+function reportToRows(report: ModuleReport): (string | number)[][] {
   return [
     [report.title],
     ["Generated at", report.generatedAt],

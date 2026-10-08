@@ -11,6 +11,7 @@ import type { ActivityLog } from "@/features/activity";
 import { useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
+import { formatDate } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
 import { MilestoneComments, type MilestoneCommentRow } from "./milestone-comments";
 import { MilestoneFormModal } from "./milestone-form-modal";
@@ -70,10 +71,6 @@ function progressColor(row: MilestoneViewRow): string {
   if (row.indicators.progress >= 100) return "#10B981";
   if (row.indicators.isOverdue) return "#EF4444";
   return "#3B82F6";
-}
-
-function formatDate(value: string | null): string {
-  return value ? new Date(value).toLocaleDateString() : "—";
 }
 
 export function MilestonesTable({

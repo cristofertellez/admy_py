@@ -3,7 +3,7 @@
 // error signals. Intentionally dependency-free; external observability
 // (OTel/Sentry) remains a roadmap item (docs/ROADMAP.md).
 
-export interface ApiRequestSample {
+interface ApiRequestSample {
   endpoint: string;
   durationMs: number;
   status: number;

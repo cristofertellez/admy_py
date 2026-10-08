@@ -175,6 +175,7 @@ Preparación para producción
 - [x] PWA: datos locales de recientes con accesos rápidos offline, prompt de actualización ("Update now"/"Remind later") según ajuste `pwa_auto_updates`, jsPDF lazy (menos bundle), categoría de ajustes PWA, auditoría del ciclo PWA vía `/api/pwa/events` y checklist de compatibilidad (14.6/14.9–14.15)
 - [x] Épica 17 — API pública v1 read-only (proyectos/tareas/clientes/hitos + OpenAPI + rate limiting + API keys hasheadas con UI en `/dashboard/integrations`), webhooks firmados con cola de reintentos e historial, bus de eventos internos (`system_events` + `after()`), reglas de automatización, feed ICS de calendario, importación CSV de clientes/proyectos con validación en dos fases, exportación global ZIP, `/api/health` y `docs/ROADMAP.md` (v2–v4)
 - [x] Cierre de pendientes accionables: lockout de cuenta con `login_max_attempts`/`auto_lock_minutes` (migración 00014, 16.13), filtro por proyecto en el Activity Log y en notificaciones (13.7/13.10/16.9), consulta limitada del log para Administrator (16.14), filtro por intermediario en el dashboard (11.12), sincronización en segundo plano desactivable (14.13), importación de tareas/hitos + formato Excel (17.10), auditoría `automation_executed` (17.16), avatares locales con `next/image` (14.10) y métricas de latencia/errores de la API en `/api/health` (17.12)
+- [x] Limpieza y documentación: código muerto eliminado (barrels huérfanos `actions/index.ts`, `components/{pwa,shared,tables}/index.ts`; acciones sin uso `signup`, `getSettings`/`updateSetting`, `getTags`, `getMyPreferences`, `getGlobalReport`/`getReportFilterOptions`, `getTimeEntries`, `updateFileCategory`, `restoreCommentAction`+`CommentsService.restoreComment`, `getCurrentRole`; constantes `ROLES`, `MILESTONE_STATUS_OPTIONS`, `APP_VERSION`; `isFlushingPendingActions`, `isReplayableAction`, `clearPendingActions`; tipos `EntityType`/`BaseEntity`/`Attachment`), ~25 exports internos des-publicados, `APP_NAME`/`APP_DESCRIPTION` conectados a los metadatos del layout (antes hardcodeados), `npm run lint` ampliado a todo el código fuente, dependencia `@tanstack/query-async-storage-persister` sin uso eliminada; README/CONTRIBUTING/ARCHITECTURE actualizados a la estructura real (incluye subsistemas de integración, PWA offline y exportaciones); esquemas Zod homogeneizados con primitivas compartidas en `schemas/shared.ts` (`optionalDate`/`dateString`/`optionalUuid`/`optionalText`/`timeString`/`hexColor`) y mensajes de validación con puntuación uniforme. Se conservan `PermissionGuard` (2.10 pendiente), hooks de resolución de conflictos offline `retryPendingAction`/`discardPendingAction` (hallazgo 14.4-A), funciones puras de indicadores/predicados de estado (seams de testing) y la arquitectura de email preparada (13.3)
 
 ---
 
@@ -918,9 +919,11 @@ Permitir visualizar todos los usuarios registrados.
 
 ### QA
 
-- [ ] Verificar paginación
-- [ ] Verificar filtros
-- [ ] Verificar búsqueda
+- [x] Verificar paginación
+- [ ] Verificar filtros (filtro de estado PASS; filtro por rol roto — la UI envía `role_id` UUID y `UsersService.list` resuelve por `name`, ver hallazgo 3.1-A)
+- [x] Verificar búsqueda
+
+QA en `docs/qa/historia-3.1-3.6-3.10-3.12-usuarios-roles.md`.
 
 Estado
 
@@ -1084,9 +1087,11 @@ Asignación de Roles
 
 ### QA
 
-- [ ] Cambio correcto
-- [ ] Cambio reflejado inmediatamente
-- [ ] Actualización de permisos
+- [x] Cambio correcto
+- [x] Cambio reflejado inmediatamente
+- [x] Actualización de permisos (rol leído de la BD en cada request; sin caché de sesión)
+
+QA en `docs/qa/historia-3.1-3.6-3.10-3.12-usuarios-roles.md`.
 
 Estado
 
@@ -1212,9 +1217,11 @@ Dashboard Administrativo
 
 ### QA
 
-- [ ] Información correcta
+- [ ] Información correcta (hallazgo 3.10-A: "Inactive Users" siempre muestra 0 porque desactivar marca `deleted_at` y el dashboard solo cuenta `deleted_at IS NULL`, mientras `/dashboard/users` sí los lista como Inactive)
 - [x] Actualización automática
 - [x] Responsive
+
+QA en `docs/qa/historia-3.1-3.6-3.10-3.12-usuarios-roles.md`.
 
 Estado
 
@@ -1271,6 +1278,8 @@ Auditoría Administrativa
 - [x] Desactivar usuario
 - [x] Cambiar contraseña
 - [x] Actualizar perfil
+
+QA en `docs/qa/historia-3.1-3.6-3.10-3.12-usuarios-roles.md` (8/8 eventos verificados en `actions/users.ts`, `actions/roles.ts`, `actions/profile.ts`).
 
 Estado
 
@@ -1346,12 +1355,14 @@ Permitir visualizar todos los clientes registrados.
 
 ### QA
 
-- [ ] Validar búsqueda
-- [ ] Validar filtros
-- [ ] Validar paginación
-- [ ] Validar rendimiento
+- [x] Validar búsqueda
+- [ ] Validar filtros (hallazgo 4.1-A: el filtro "Status" filtra la columna `status`, que nunca se actualiza al archivar — archivar togglea `is_active`; "Inactive" siempre vacío y archivados visibles como "active")
+- [x] Validar paginación (implementación; dataset actual de 5 clientes no alcanza la página 2)
+- [x] Validar rendimiento (2 consultas, sin N+1; LIKE con comodín inicial sin índice — nota a escala)
 
 Implementación: `/dashboard/clients` con estado en URL (search, status, page), búsqueda debounced server-side (company_name/contact_name/email), filtro de estado, paginación real con `ClientsService.list` (`total` + LIMIT/OFFSET), acciones rápidas View/Edit/Archive-Restore con confirmación y feedback accesible (aria-live). Build, TypeScript y ESLint verificados sin errores.
+
+QA en `docs/qa/historia-4.1-4.3-4.5-clientes.md`.
 
 Estado
 
@@ -1424,10 +1435,12 @@ Editar Cliente
 
 ### QA
 
-- [ ] Validar actualización
-- [ ] Validar historial
+- [x] Validar actualización (guard `clients.update`, Zod compartido, revalidación listado+detalle)
+- [x] Validar historial (diff old/new solo de campos modificados; `updated_client` alimenta el Timeline)
 
 Implementación: edición de clientes vía modal en `/dashboard/clients` (`updateClient` con esquema Zod compartido, guard `clients.update` y auditoría `updated_client` con diff `old_value`/`new_value` solo de campos modificados; sin cambios reales no se escribe evento).
+
+QA en `docs/qa/historia-4.1-4.3-4.5-clientes.md`.
 
 Estado
 
@@ -1501,10 +1514,12 @@ Mostrar toda la información consolidada del cliente.
 
 ### QA
 
-- [ ] Información correcta
-- [ ] Responsive
+- [x] Información correcta (agregados verificados contra BD: proyectos, horas, entregas próximas, historial; badge Active/Archived vía `is_active`)
+- [x] Responsive (grids adaptativos, pestañas con scroll horizontal y ARIA tablist)
 
 Implementación: `/dashboard/clients/[id]` reconstruida como vista dashboard con widgets (total/activos/finalizados/horas), pestañas Overview | Projects | Timeline (`client-tabs.tsx`), tarjeta de intermediario asignado, timeline de actividad del cliente reutilizando `ActivityTimeline` y métodos de servicio `getProjects`, `getAssignedIntermediary`, `getRecentActivity` con `assertClientVisible`. Las secciones Archivos y Comentarios se integran en las historias 4.8 y 4.9.
+
+QA en `docs/qa/historia-4.1-4.3-4.5-clientes.md`.
 
 Estado
 
@@ -1813,11 +1828,13 @@ Permitir visualizar todos los intermediarios registrados.
 
 ### QA
 
-- [ ] Validar filtros
-- [ ] Validar búsqueda
-- [ ] Validar rendimiento
+- [x] Validar filtros (filtro de estado sobre `is_active`, coherente con Deactivate/Activate)
+- [x] Validar búsqueda (nombre/email, debounced server-side; probe real "vega" → 1)
+- [x] Validar rendimiento (2 consultas, sin N+1)
 
 Implementación: `/dashboard/intermediaries` con estado en URL (search, status, page), búsqueda debounced server-side (nombre/email) y filtro de estado con `IntermediariesService.list` (`total` + LIMIT/OFFSET), indicadores rápidos Total/Active/Inactive vía `getStats()`, acciones View/Edit/Deactivate-Activate con confirmación previa al desactivado, resultados tipados y feedback accesible (`aria-live`); detalle en `/dashboard/intermediaries/[id]` con clientes asignados.
+
+QA en `docs/qa/historia-5.1-5.4-5.5-5.7-5.9-intermediarios.md`.
 
 Estado
 
@@ -1923,10 +1940,12 @@ Permitir asignar múltiples clientes a un intermediario.
 
 ### QA
 
-- [ ] Asignación correcta
-- [ ] Eliminación correcta
+- [x] Asignación correcta (guard + Zod, intermediario activo, visibilidad por cliente, duplicados omitidos, reasignación auditada)
+- [x] Eliminación correcta (valida asignación actual, confirmación previa, auditoría `removed_intermediary`)
 
 Implementación: selector múltiple en `/dashboard/intermediaries/[id]` (`assigned-clients-card.tsx`) con buscador client-side (empresa/contacto/correo), checkboxes con estado por cliente ("Current" deshabilitado, "Reassign" cuando pertenece a otro intermediario) y confirmación previa para remover. Acciones `assignClientsToIntermediary` (esquema Zod `assignClientsToIntermediarySchema`, guard `clients.update`, omite duplicados sin fallar y reasigna clientes de otros intermediarios) y `removeClientFromIntermediary` (valida que el cliente esté asignado a este intermediario), ambas con auditoría en `activity_logs` (`assigned_intermediary`/`removed_intermediary` con old/new) y revalidación de las páginas afectadas. Servicio: `ClientsService.listCandidatesForIntermediary` (con `clientScope`) y `ClientsService.assignClientsToIntermediary`. TypeScript, ESLint y build verificados sin errores.
+
+QA en `docs/qa/historia-5.1-5.4-5.5-5.7-5.9-intermediarios.md`.
 
 Estado
 
@@ -1961,10 +1980,12 @@ Vista General del Intermediario
 
 ### QA
 
-- [ ] Información correcta
-- [ ] Responsive
+- [x] Información correcta (agregados verificados contra BD: proyectos, horas, entregas próximas, actividad; self-access + guard Developer)
+- [x] Responsive (grids adaptativos, pestañas con scroll horizontal y ARIA tablist)
 
 Implementación: `/dashboard/intermediaries/[id]` reconstruida como vista dashboard con tarjetas Total/Active/Completed Projects y Worked Hours (reutiliza `IntermediaryReportsService.getReport`, Historia 5.12), widgets "Upcoming Deliveries" (hitos y proyectos con vencimiento en 30 días) y "Last Activity" (`IntermediariesService.getLastActivity`), y pestañas Overview | Timeline (`intermediary-tabs.tsx`) con estado en URL (`tab`, `q`, `category`, `page`). La pestaña Timeline agrega los eventos de la cartera del intermediario vía `IntermediariesService.getHistory` (eventos `entity='Client'` de clientes asignados + eventos de sus proyectos + comentarios asociados) reutilizando `CLIENT_HISTORY_ACTIONS`, `HistoryFilters` y `ActivityTimeline`; Overview integra la información personal y la tarjeta de clientes asignados con el selector múltiple de 5.4. Build, TypeScript y ESLint verificados sin errores.
+
+QA en `docs/qa/historia-5.1-5.4-5.5-5.7-5.9-intermediarios.md`.
 
 Estado
 
@@ -2031,10 +2052,12 @@ Seguimiento de Proyectos
 
 ### QA
 
-- [ ] Progreso correcto
-- [ ] Estados correctos
+- [x] Progreso correcto (completion_percentage acotado 0-100, barra accesible; valores reales verificados)
+- [x] Estados correctos (Active/Finalized coherentes UI/servicio; badges por estado; Overdue verificado con proyecto vencido real)
 
 Implementación: pestaña "Projects (N)" en `/dashboard/intermediaries/[id]` (`intermediary-tabs.tsx`) con tarjetas por proyecto agrupadas en Active/Finalized. Los datos provienen de `IntermediaryReportsService.getReport` (proyectos de los clientes asignados al intermediario, mismos criterios de visibilidad que `lib/auth-scope.ts`): progreso vía `completion_percentage`, estado y prioridad, horas trabajadas/estimadas, cliente y fechas estimadas. Cada tarjeta incluye nombre enlazado a `/dashboard/projects/{id}`, empresa del cliente, badge de estado codificado (Completed=success, Cancelled/Archived/Suspended=error, resto=warning), badge "Overdue" cuando `estimated_end_date` pasó y el proyecto sigue activo, barra de progreso accesible (`role="progressbar"` con aria-valuenow/min/max) y fechas importantes (inicio/fin). Build, TypeScript y ESLint verificados sin errores.
+
+QA en `docs/qa/historia-5.1-5.4-5.5-5.7-5.9-intermediarios.md`.
 
 Estado
 
@@ -2098,11 +2121,13 @@ Comentarios
 
 ### QA
 
-- [ ] Crear
-- [ ] Editar
-- [ ] Responder
+- [x] Crear (formulario raíz con cola offline PWA, validación de visibilidad, auditoría y notificación)
+- [x] Editar (edición inline, autor-o-moderador en capa de datos, is_edited + auditoría)
+- [x] Responder (parent validado mismo proyecto, auditoría `replied_comment`, hilos anidados)
 
 Implementación: `CommentsService.listByProject` ahora devuelve hilos completos (respuestas incluidas), `createProjectComment` valida que el comentario padre pertenezca al mismo proyecto y se añadieron `updateProjectComment` (autor o moderador con `comments.update`) y moderación de borrado alineada a comentarios de cliente (`comments.delete`). Acciones: `createProjectCommentAction` soporta respuestas (auditoría `replied_comment` vs `created_comment`, notificación `comment_created`), nuevas `updateProjectCommentAction` (`updated_comment`) y borrado con auditoría (`deleted_comment`). UI: pestaña Comments de `/dashboard/projects/[id]` reconstruida como timeline agrupado por hilos (patrón Historia 4.9) con responder, edición inline, borrado con confirmación, controles gated por permisos/autoría; el formulario raíz conserva la cola offline PWA (`project-comment.create`). Menciones y adjuntos en comentarios quedan para una iteración posterior.
+
+QA en `docs/qa/historia-5.1-5.4-5.5-5.7-5.9-intermediarios.md`.
 
 Estado
 
@@ -2950,7 +2975,7 @@ Integraciones obligatorias
 
 Estado
 
-Backlog
+Done
 
 Prioridad
 
@@ -6660,6 +6685,8 @@ Configurar la aplicación para que pueda instalarse como una PWA compatible con 
 - [ ] Compatibilidad (pendiente prueba física en dispositivos, ver Historia 14.11)
 - [x] Lighthouse PWA (100%, ver docs/qa/historia-14.2-instalacion-pwa.md)
 
+QA en `docs/qa/historia-14.1-14.4-pwa-testing.md` (2026-10-04: manifest, SW con `Service-Worker-Allowed: /`, iconos y metadatos re-verificados por HTTP con build de producción; banner de instalación e indicadores verificados en código).
+
 Estado
 
 Testing
@@ -6696,6 +6723,8 @@ Permitir instalar la aplicación desde
 Guía de pruebas: docs/qa/historia-14.2-instalacion-pwa.md
 
 Chrome, Edge y Windows validados a nivel de criterios técnicos y Lighthouse; pendiente humo manual con UI en sesión real. Android e iOS requieren despliegue HTTPS y dispositivos físicos.
+
+QA en `docs/qa/historia-14.1-14.4-pwa-testing.md` (2026-10-04: criterios Chromium re-verificados por HTTP con build de producción — manifest/SW/headers/iconos/apple-touch-icon; pruebas físicas siguen pendientes por entorno).
 
 Estado
 
@@ -6745,6 +6774,8 @@ Disponibles Offline
 
 Guía de pruebas: docs/qa/historia-14.3-modo-offline.md
 
+QA en `docs/qa/historia-14.1-14.4-pwa-testing.md` (2026-10-04: todas las afirmaciones del SW verificadas en código — estrategias de caché por tipo, exclusión de prefetch, RSC fallback, límites 20/60 — y `/offline` + banner verificados por HTTP; pasos con DevTools pendientes de pase humano).
+
 Estado
 
 Testing
@@ -6768,7 +6799,9 @@ Cuando la conexión regrese
 
 Guía de pruebas: docs/qa/historia-14.4-sincronizacion-automatica.md
 
-Nota: la cola está disponible como infraestructura (`enqueueOfflineMutation` + `registerSyncHandler`); los módulos de features la adoptarán al migrar sus formularios a mutaciones de cliente.
+Nota: la cola persistente vive en `lib/offline/pending-actions.ts` (clave `pwa-pending-actions-v1`, payloads Zod, 5 tipos de acción) con flush FIFO en `lib/offline/sync.ts` y orquestación en `lib/sync/sync-manager.ts`; las features ya la usan vía `useQueuedFormAction` (comentarios de proyecto/tarea, task.update/complete, project.update).
+
+QA en `docs/qa/historia-14.1-14.4-pwa-testing.md` (2026-10-04: sincronización, estado del indicador y registro de errores verificados; **hallazgo 14.4-A**: `retryPendingAction`/`discardPendingAction` no tienen superficie de UI — el Retry global omite conflictos y el badge "N conflicts" no puede limpiarse manualmente).
 
 Estado
 

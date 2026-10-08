@@ -14,7 +14,7 @@ export interface DashboardWidgetConfig {
 
 export type WidgetLayoutMap = Record<string, DashboardWidgetConfig>;
 
-export const DEVELOPER_WIDGETS: DashboardWidgetDefinition[] = [
+const DEVELOPER_WIDGETS: DashboardWidgetDefinition[] = [
   { id: "taskStatusChart", label: "Tasks by Status" },
   { id: "projectStatusChart", label: "Projects by Status" },
   { id: "hoursChart", label: "Hours — Estimated vs Worked" },
@@ -25,7 +25,7 @@ export const DEVELOPER_WIDGETS: DashboardWidgetDefinition[] = [
   { id: "recentFiles", label: "Recent Files" },
 ];
 
-export const CLIENT_WIDGETS: DashboardWidgetDefinition[] = [
+const CLIENT_WIDGETS: DashboardWidgetDefinition[] = [
   { id: "myProjects", label: "My Projects" },
   { id: "upcomingMilestones", label: "Upcoming Milestones" },
   { id: "upcomingDeliveries", label: "Upcoming Deliveries" },
@@ -33,7 +33,7 @@ export const CLIENT_WIDGETS: DashboardWidgetDefinition[] = [
   { id: "recentFiles", label: "Recent Files" },
 ];
 
-export const INTERMEDIARY_WIDGETS: DashboardWidgetDefinition[] = [
+const INTERMEDIARY_WIDGETS: DashboardWidgetDefinition[] = [
   { id: "dueSoonProjects", label: "Projects Due Soon" },
   { id: "pendingTasks", label: "Pending Tasks" },
   { id: "recentComments", label: "Latest Comments" },

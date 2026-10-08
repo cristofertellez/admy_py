@@ -2,6 +2,7 @@ import { Badge } from "@/components/shared/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/shared/card";
 import { ProgressRing } from "@/components/charts";
 import Link from "next/link";
+import { formatDate } from "@/lib/utils";
 import type { ProjectMetricsBundle } from "@/features/projects";
 
 // Historia 6.8 — Dashboard del Proyecto. Server-rendered widgets fed by the
@@ -55,10 +56,6 @@ const RISK_VARIANT: Record<string, "success" | "warning" | "error"> = {
   medium: "warning",
   high: "error",
 };
-
-function formatDate(value: string | null): string {
-  return value ? new Date(value).toLocaleDateString() : "—";
-}
 
 export function ProjectDashboard({
   projectId,

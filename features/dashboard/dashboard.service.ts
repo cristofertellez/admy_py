@@ -84,7 +84,7 @@ function taskFilterFragment(filters: DashboardFilters, alias = "t"): { sql: stri
   return { sql: parts.join(" AND "), args };
 }
 
-export interface DashboardStats {
+interface DashboardStats {
   totalClients: number;
   activeClients: number;
   inactiveClients: number;

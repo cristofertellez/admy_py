@@ -57,7 +57,7 @@ function getRecentQueueErrors(): SyncError[] {
  * 2. Replays the persistent pending-actions queue (see offline/sync.ts).
  * 3. Invalidates queries so server state (source of truth) refreshes the UI.
  */
-export class SyncManager {
+class SyncManager {
   private readonly queryClient: QueryClient;
   private listeners = new Set<SyncListener>();
   private unsubscribeFns: Array<() => void> = [];

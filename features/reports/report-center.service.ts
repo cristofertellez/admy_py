@@ -20,18 +20,18 @@ export interface ReportFilters {
   userId?: string;
 }
 
-export interface ReportKpi {
+interface ReportKpi {
   label: string;
   value: string | number;
   hint?: string;
 }
 
-export interface ReportTable {
+interface ReportTable {
   columns: string[];
   rows: (string | number)[][];
 }
 
-export interface ReportChartItem {
+interface ReportChartItem {
   label: string;
   value: number;
 }

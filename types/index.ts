@@ -35,18 +35,6 @@ export type MilestoneStatus =
 
 export type Priority = "Very Low" | "Low" | "Medium" | "High" | "Critical" | "Urgent";
 
-export type EntityType = "Project" | "Task" | "Comment" | "User" | "Milestone";
-
-export interface BaseEntity {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
-  updated_by: string | null;
-  deleted_at: string | null;
-  is_active: boolean;
-}
-
 export interface User {
   id: string;
   first_name: string;
@@ -165,23 +153,6 @@ export interface Comment {
   message: string;
   is_edited: boolean;
   edited_at: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-  is_active: boolean;
-}
-
-export interface Attachment {
-  id: string;
-  bucket: string;
-  storage_path: string;
-  filename: string;
-  extension: string | null;
-  mime_type: string | null;
-  size_bytes: number | null;
-  uploaded_by: string;
-  entity_type: string;
-  entity_id: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

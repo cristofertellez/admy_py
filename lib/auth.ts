@@ -75,8 +75,3 @@ export async function requirePermission(permission: string): Promise<SessionProf
 
   return user;
 }
-
-export async function getCurrentRole(): Promise<string | null> {
-  const user = await getUser();
-  return user?.role || null;
-}

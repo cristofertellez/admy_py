@@ -15,19 +15,19 @@ function isValidTimezone(timezone: string): boolean {
   }
 }
 
-export const timezoneSchema = z
+const timezoneSchema = z
   .string()
   .trim()
-  .min(1, "Timezone is required")
-  .max(64, "Invalid timezone")
-  .refine(isValidTimezone, "Invalid timezone");
+  .min(1, "Timezone is required.")
+  .max(64, "Invalid timezone.")
+  .refine(isValidTimezone, "Invalid timezone.");
 
-export const dashboardPreferencesSchema = z.record(z.unknown());
+const dashboardPreferencesSchema = z.record(z.unknown());
 
 export const updatePreferencesSchema = z.object({
-  language: z.enum(SUPPORTED_LANGUAGES, { message: "Invalid language" }),
+  language: z.enum(SUPPORTED_LANGUAGES, { message: "Invalid language." }),
   timezone: timezoneSchema,
-  theme: z.enum(SUPPORTED_THEMES, { message: "Invalid theme" }),
+  theme: z.enum(SUPPORTED_THEMES, { message: "Invalid theme." }),
   dashboard_preferences: dashboardPreferencesSchema.default({}),
 });
 

@@ -13,7 +13,7 @@ import { newId, query, queryOne } from "@/lib/turso/client";
 import { hasFullAccess } from "@/lib/roles";
 import type { Comment } from "@/types";
 
-export interface CommentWithAuthor extends Comment {
+interface CommentWithAuthor extends Comment {
   users: { first_name: string; last_name: string; avatar: string | null };
 }
 
@@ -39,42 +39,11 @@ function mapCommentWithAuthor<T extends Comment & CommentAuthorColumns>(
   };
 }
 
-// Historia 9.10 — Eliminación lógica con restauración. Las cuatro tablas de
-// comentarios comparten el mismo esquema, así que el ciclo de vida
-// (borrado/restauración) se centraliza en un único punto.
-const COMMENT_TABLES = {
-  project: "project_comments",
-  task: "task_comments",
-  milestone: "milestone_comments",
-  client: "client_comments",
-} as const;
-
-export type CommentEntityType = keyof typeof COMMENT_TABLES;
+// Historia 9.10 — Eliminación lógica: las cuatro tablas de comentarios
+// comparten el mismo esquema y el borrado se centraliza por superficie en
+// los métodos delete* (autor o permiso comments.delete a nivel servidor).
 
 export class CommentsService {
-  static async restoreComment(entityType: CommentEntityType, id: string) {
-    const table = COMMENT_TABLES[entityType];
-    if (!table) throw new Error("Invalid comment entity type.");
-
-    const user = await requireScopedUser();
-    const comment = await queryOne<{ user_id: string; deleted_at: string | null }>(
-      `SELECT user_id, deleted_at FROM ${table} WHERE id = ?`,
-      [id],
-    );
-    if (!comment || comment.deleted_at === null) throw new Error("Comment not found.");
-
-    const canModerate = hasFullAccess(user.role) || hasPermission(user, "comments.delete");
-    if (!canModerate && comment.user_id !== user.id) {
-      throw new Error("You can only restore your own comments.");
-    }
-
-    const now = new Date().toISOString();
-    await query(
-      `UPDATE ${table} SET is_active = 1, deleted_at = NULL, updated_at = ? WHERE id = ?`,
-      [now, id],
-    );
-  }
-
   static async listByProject(projectId: string) {
     const scope = await projectScope("pc.project_id");
     const rows = await query<Comment & CommentAuthorColumns>(

@@ -94,31 +94,57 @@ npm start
 ## Project Structure
 
 ```
-app/              # Next.js App Router pages
+app/              # Next.js App Router pages and API routes
+  dashboard/      # Authenticated application (per-module pages)
+  api/            # Route Handlers (files, exports, public API v1, health)
 components/       # Reusable UI components
-  ui/             # Base components (Button, Input)
-  layout/         # Layout components (Header, Sidebar)
+  ui/             # Base components (Button)
+  layout/         # Layout components (Header, NotificationsBell)
   tables/         # DataTable components
   forms/          # Form fields
-  shared/         # Shared components (Badge, Card)
-features/         # Business logic by domain
-  clients/        # Client management
-  projects/       # Project management
-  tasks/          # Task management
-  comments/       # Comments system
-  dashboard/      # Dashboard stats
-  reports/        # Reports service
-hooks/            # React hooks
+  shared/         # Shared components (Badge, Card, GlobalSearch...)
+  charts/         # Chart widgets (BarChart, Timeline, ProgressRing)
+  dashboard/      # Dashboard widget library (KpiCard, ListCard...)
+  pwa/            # PWA components (InstallPrompt, OfflineBanner...)
+features/         # Business logic by domain (service + types + index.ts)
+  clients/ projects/ tasks/ milestones/ comments/ files/
+  intermediaries/ users/ dashboard/ reports/ notifications/
+  settings/ preferences/ tags/ time-entries/ templates/ checklists/
+  reactions/ activity/ api-keys/ webhooks/ automations/
+actions/          # Server Actions by domain (auth, projects, tasks...)
+schemas/          # Zod validation schemas (shared by client and server)
+hooks/            # React hooks (useDebounce, useConnectivity, offline queue)
+services/         # Cross-cutting services (activity/audit log)
+lib/              # Core utilities and infrastructure
+  turso/         # Database client and query helpers
+  auth/          # Password hashing
+  auth-scope.ts  # Row-level authorization filters (Client/Intermediary scopes)
+  api/            # Public API helpers (auth, rate limiting, metrics)
+  events/        # Internal event bus (system_events)
+  offline/        # PWA offline action queue
+  sync/          # Online/offline sync manager
+  storage/        # Cloudflare R2 client
+  routes.ts      # Role-based route protection
+  exports.ts      # CSV/XLSX export helpers
+  monitoring.ts   # Health-check and API metrics
 providers/        # React context providers
-schemas/          # Zod validation schemas
-services/         # Base service classes
-actions/          # Server Actions barrel
-lib/              # Utilities, Turso client and auth config
-types/            # TypeScript type definitions
-constants/        # App constants
-utils/            # Helper functions
+types/            # Shared TypeScript type definitions
+constants/        # App constants (statuses, transitions, options)
+docs/             # QA guides and technical roadmap
+scripts/          # Migration and seed scripts
 turso/            # Database migrations
 ```
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run build` | Production build |
+| `npm run lint` | ESLint (app, lib, features, actions, components, hooks, services) |
+| `npm run format` | Prettier (all files) |
+| `npm run db:migrate` | Apply Turso migrations |
+| `npm run db:seed` | Seed demo data (see above) |
 
 ## Documentation
 
@@ -128,6 +154,8 @@ turso/            # Database migrations
 - [AGENTS.md](./AGENTS.md) — AI Development Rules
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — Architecture
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — Contributing Guide
+- [docs/ROADMAP.md](./docs/ROADMAP.md) — Technical roadmap (v2–v4)
+- [docs/qa/](./docs/qa/) — QA testing guides
 
 ## License
 

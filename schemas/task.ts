@@ -1,22 +1,5 @@
 import { z } from "zod";
-
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-const optionalDate = z
-  .union([z.string(), z.null()])
-  .optional()
-  .transform((value) => (typeof value === "string" && value.trim() ? value.trim() : null))
-  .refine((value) => value === null || DATE_PATTERN.test(value), {
-    message: "Invalid date format.",
-  });
-
-const optionalUuid = z
-  .union([z.string(), z.null()])
-  .optional()
-  .transform((value) => (typeof value === "string" && value.trim() ? value.trim() : null))
-  .refine((value) => value === null || z.string().uuid().safeParse(value).success, {
-    message: "Invalid user.",
-  });
+import { optionalDate, optionalUuid } from "./shared";
 
 // PRD §80: every task needs an assignee unless it is still "Pending" or "Planned".
 function assertAssigneeByStatus(data: { assigned_to: string | null; status: string }) {
@@ -44,17 +27,17 @@ function refineTask<T extends z.ZodTypeAny>(schema: T) {
 }
 
 const taskBaseSchema = z.object({
-  project_id: z.string().uuid("Project is required"),
-  parent_task_id: optionalUuid,
-  title: z.string().trim().min(1, "Task title is required").max(200, "Task title is too long"),
+  project_id: z.string().uuid("Project is required."),
+  parent_task_id: optionalUuid("Invalid task."),
+  title: z.string().trim().min(1, "Task title is required.").max(200, "Task title is too long."),
   description: z
     .string()
     .trim()
-    .max(4000, "Description is too long")
+    .max(4000, "Description is too long.")
     .optional()
     .nullable()
     .transform((value) => value || null),
-  assigned_to: optionalUuid,
+  assigned_to: optionalUuid("Invalid user."),
   // Status/priority are validated at the action layer against the configured
   // catalogs (Historia 15.15), so custom statuses added in settings are accepted.
   status: z.string().min(1, "Status is required.").default("Pending"),

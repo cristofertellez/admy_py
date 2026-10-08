@@ -3,7 +3,7 @@ import { hasFullAccess } from "@/lib/roles";
 import { queryOne, type InValue } from "@/lib/turso/client";
 import { ActivityService } from "@/services/activity.service";
 
-export interface ScopeClause {
+interface ScopeClause {
   sql: string;
   args: InValue[];
 }
@@ -295,7 +295,7 @@ export async function assertEntityVisible(
 
 // A comment's visibility follows its parent entity. Since comments live across
 // four tables (project/task/milestone/client) the parent is resolved by lookup.
-export async function assertCommentVisible(commentId: string, user?: SessionProfile): Promise<void> {
+async function assertCommentVisible(commentId: string, user?: SessionProfile): Promise<void> {
   const actor = user ?? (await requireUser());
   if (isFullAccessUser(actor)) return;
 

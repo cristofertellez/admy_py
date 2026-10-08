@@ -33,7 +33,7 @@ export interface UpcomingDelivery {
   due_date: string;
 }
 
-export interface IntermediaryProductivity {
+interface IntermediaryProductivity {
   totalTasks: number;
   pendingTasks: number;
   inProgressTasks: number;
@@ -45,7 +45,7 @@ export interface IntermediaryProductivity {
   hourUtilizationRate: number;
 }
 
-export interface IntermediaryReportSummary {
+interface IntermediaryReportSummary {
   activeProjects: number;
   completedProjects: number;
   totalClients: number;

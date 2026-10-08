@@ -2,6 +2,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/ca
 import { Badge } from "@/components/shared/badge";
 import { ProgressRing } from "@/components/charts/progress-ring";
 import { BarChart } from "@/components/charts/bar-chart";
+import { formatDate } from "@/lib/utils";
 import type { ProjectMetricsBundle } from "@/features/projects";
 import type { HealthStatus, RiskLevel } from "@/features/projects/projects-indicators.types";
 
@@ -26,12 +27,6 @@ function formatDays(value: number | null): string {
   if (value === null) return "—";
   const unit = Math.abs(value) === 1 ? "day" : "days";
   return `${value > 0 ? "+" : ""}${value} ${unit}`;
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return "Not set";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Not set" : date.toLocaleDateString();
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -149,10 +144,10 @@ export function IndicatorsTab({ bundle }: { bundle: ProjectMetricsBundle }) {
         </CardHeader>
         <CardContent>
           <dl className="grid gap-x-8 md:grid-cols-2">
-            <DefinitionRow term="Estimated start" detail={formatDate(schedule.estimatedStartDate)} />
-            <DefinitionRow term="Real start" detail={formatDate(schedule.realStartDate)} />
-            <DefinitionRow term="Estimated end" detail={formatDate(schedule.estimatedEndDate)} />
-            <DefinitionRow term="Real end" detail={formatDate(schedule.realEndDate)} />
+            <DefinitionRow term="Estimated start" detail={formatDate(schedule.estimatedStartDate, "Not set")} />
+            <DefinitionRow term="Real start" detail={formatDate(schedule.realStartDate, "Not set")} />
+            <DefinitionRow term="Estimated end" detail={formatDate(schedule.estimatedEndDate, "Not set")} />
+            <DefinitionRow term="Real end" detail={formatDate(schedule.realEndDate, "Not set")} />
             <DefinitionRow
               term="Planned duration"
               detail={schedule.plannedDurationDays === null ? "—" : `${schedule.plannedDurationDays} days`}

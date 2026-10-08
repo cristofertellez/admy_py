@@ -3,8 +3,6 @@
 import { ReportsService, ReportCenterService, isReportId } from "@/features/reports";
 import { ProjectExportService } from "@/features/projects";
 import { hasPermission, requirePermission } from "@/lib/auth";
-import { hasFullAccess } from "@/lib/roles";
-import { countRows } from "@/lib/turso/client";
 import { ActivityService } from "@/services/activity.service";
 
 export async function getProjectReport(projectId: string) {
@@ -33,43 +31,6 @@ export async function getProjectExportData(projectId: string) {
   }
 }
 
-export async function getGlobalReport() {
-  try {
-    const user = await requirePermission("reports.view");
-
-    if (!hasFullAccess(user.role)) {
-      return { error: "You do not have access to global reports." };
-    }
-
-    const [
-      totalProjects,
-      activeProjects,
-      totalClients,
-      activeClients,
-      totalTasks,
-      completedTasks,
-    ] = await Promise.all([
-      countRows(`SELECT COUNT(*) AS total FROM projects WHERE deleted_at IS NULL`),
-      countRows(`SELECT COUNT(*) AS total FROM projects WHERE status = 'Active'`),
-      countRows(`SELECT COUNT(*) AS total FROM clients WHERE deleted_at IS NULL`),
-      countRows(`SELECT COUNT(*) AS total FROM clients WHERE status = 'active'`),
-      countRows(`SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL`),
-      countRows(`SELECT COUNT(*) AS total FROM tasks WHERE status = 'Completed'`),
-    ]);
-
-    return {
-      totalProjects,
-      activeProjects,
-      totalClients,
-      activeClients,
-      totalTasks,
-      completedTasks,
-      taskCompletionRate: totalTasks ? (completedTasks / totalTasks) * 100 : 0,
-    };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to load report." };
-  }
-}
 // ============================================================
 // Epica 12 — Centro de Reportes
 // ============================================================
@@ -119,14 +80,5 @@ export async function logReportExported(reportId: string, format: string) {
     return { success: "Export logged." };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to log export." };
-  }
-}
-
-export async function getReportFilterOptions() {
-  await requirePermission("reports.view");
-  try {
-    return await ReportCenterService.getFilterOptions();
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to load filters." };
   }
 }

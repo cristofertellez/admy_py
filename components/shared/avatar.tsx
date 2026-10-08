@@ -47,7 +47,7 @@ export function UserAvatar({ name, src, size = 64, className }: UserAvatarProps)
             className="h-full w-full object-cover"
           />
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- remote signed URLs are incompatible with next/image config
+          // Historia 14.10 — remote signed URLs are incompatible with next/image config, so a plain <img> is required here.
           <img src={resolvedSrc} alt={name} className="h-full w-full object-cover" />
         )
       ) : (

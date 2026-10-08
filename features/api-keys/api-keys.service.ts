@@ -5,7 +5,7 @@ import type { SessionProfile } from "@/lib/auth";
 // Épica 17 (17.2) — API key management. Keys are shown once at creation and
 // stored as SHA-256 hashes; usage and revocation are audited by the callers.
 
-export interface ApiKeyRow {
+interface ApiKeyRow {
   id: string;
   name: string;
   prefix: string;

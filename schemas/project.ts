@@ -1,39 +1,25 @@
 import { z } from "zod";
 import { MAX_TAGS_PER_PROJECT } from "@/constants";
-
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-const optionalDate = z
-  .union([z.string(), z.null()])
-  .optional()
-  .transform((value) => (typeof value === "string" && value.trim() ? value.trim() : null))
-  .refine((value) => value === null || DATE_PATTERN.test(value), {
-    message: "Invalid date format.",
-  });
+import { optionalDate, optionalUuid } from "./shared";
 
 const projectBaseSchema = z.object({
-  name: z.string().trim().min(1, "Project name is required").max(150, "Project name is too long"),
+  name: z.string().trim().min(1, "Project name is required.").max(150, "Project name is too long."),
   code: z
     .string()
     .trim()
-    .max(50, "Code is too long")
+    .max(50, "Code is too long.")
     .optional()
     .nullable()
     .transform((value) => value || null),
   description: z
     .string()
     .trim()
-    .max(2000, "Description is too long")
+    .max(2000, "Description is too long.")
     .optional()
     .nullable()
     .transform((value) => value || null),
-  client_id: z.string().uuid("Client is required"),
-  intermediary_id: z
-    .string()
-    .uuid("Invalid intermediary.")
-    .optional()
-    .nullable()
-    .transform((value) => value || null),
+  client_id: z.string().uuid("Client is required."),
+  intermediary_id: optionalUuid("Invalid intermediary."),
   // Status/priority are validated at the action layer against the configured
   // catalogs (Historia 15.15), so custom statuses added in settings are accepted.
   status: z.string().min(1, "Status is required.").default("Proposed"),

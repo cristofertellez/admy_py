@@ -7,15 +7,10 @@ import { ActivityService } from "@/services/activity.service";
 import { timeEntrySchema } from "@/schemas";
 import type { z } from "zod";
 
-export type TimeEntryActionState = { success?: string; error?: string };
+type TimeEntryActionState = { success?: string; error?: string };
 
 function firstIssueMessage(error: z.ZodError): string {
   return error.issues[0]?.message ?? "Invalid data.";
-}
-
-export async function getTimeEntries(taskId: string) {
-  await requirePermission("tasks.read");
-  return TimeEntriesService.listByTask(taskId);
 }
 
 // Manual time registration (Historia 7.11); also used by the task timer

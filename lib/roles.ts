@@ -2,7 +2,7 @@
 // Developer = full access; Administrator = complete management;
 // Super Administrator = total access. Client/Intermediary are scoped
 // stakeholders and must go through lib/auth-scope filters.
-export const FULL_ACCESS_ROLES = [
+const FULL_ACCESS_ROLES = [
   "Developer",
   "Administrator",
   "Super Administrator",

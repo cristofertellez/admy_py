@@ -1,6 +1,6 @@
 import { newId, query, queryOne } from "@/lib/turso/client";
 
-export interface ActivityLogEntry {
+interface ActivityLogEntry {
   user_id: string;
   action: string;
   entity: string;

@@ -24,11 +24,6 @@ function revalidateTagViews() {
   revalidatePath("/dashboard");
 }
 
-export async function getTags() {
-  await requirePermission("tasks.read");
-  return TagsService.list();
-}
-
 export async function createTag(formData: FormData): Promise<TagActionState> {
   const actor = await requirePermission("tasks.create");
 

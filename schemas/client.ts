@@ -1,27 +1,20 @@
 import { z } from "zod";
+import { optionalText } from "./shared";
 
-const optionalText = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max, `Must be ${max} characters or fewer`)
-    .optional()
-    .or(z.literal(""));
-
-export const clientStatusSchema = z.enum(["active", "inactive"]);
+const clientStatusSchema = z.enum(["active", "inactive"]);
 
 export const clientSchema = z.object({
   company_name: z
     .string()
     .trim()
-    .min(1, "Company name is required")
-    .max(200, "Company name must be 200 characters or fewer"),
+    .min(1, "Company name is required.")
+    .max(200, "Company name must be 200 characters or fewer."),
   contact_name: optionalText(150),
   email: z
     .string()
     .trim()
-    .email("Invalid email")
-    .max(200, "Email must be 200 characters or fewer")
+    .email("Invalid email.")
+    .max(200, "Email must be 200 characters or fewer.")
     .optional()
     .or(z.literal("")),
   phone: optionalText(50),
@@ -31,21 +24,21 @@ export const clientSchema = z.object({
   website: z
     .string()
     .trim()
-    .url("Invalid URL")
-    .max(300, "Website must be 300 characters or fewer")
+    .url("Invalid URL.")
+    .max(300, "Website must be 300 characters or fewer.")
     .optional()
     .or(z.literal("")),
   notes: optionalText(5000),
   status: clientStatusSchema.default("active"),
-  intermediary_id: z.string().uuid("Invalid intermediary").optional().nullable(),
+  intermediary_id: z.string().uuid("Invalid intermediary.").optional().nullable(),
 });
 
 export const assignClientsToIntermediarySchema = z.object({
-  intermediary_id: z.string().uuid("Invalid intermediary"),
+  intermediary_id: z.string().uuid("Invalid intermediary."),
   client_ids: z
-    .array(z.string().uuid("Invalid client"))
-    .min(1, "Select at least one client")
-    .max(200, "Select at most 200 clients"),
+    .array(z.string().uuid("Invalid client."))
+    .min(1, "Select at least one client.")
+    .max(200, "Select at most 200 clients."),
 });
 
 export type AssignClientsToIntermediaryInput = z.infer<typeof assignClientsToIntermediarySchema>;

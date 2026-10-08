@@ -1,22 +1,13 @@
 import { z } from "zod";
-
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-const optionalDate = z
-  .union([z.string(), z.null()])
-  .optional()
-  .transform((value) => (typeof value === "string" && value.trim() ? value.trim() : null))
-  .refine((value) => value === null || DATE_PATTERN.test(value), {
-    message: "Invalid date format.",
-  });
+import { optionalDate } from "./shared";
 
 const milestoneBaseSchema = z.object({
-  project_id: z.string().uuid("Project is required"),
-  title: z.string().trim().min(1, "Milestone title is required").max(200, "Milestone title is too long"),
+  project_id: z.string().uuid("Project is required."),
+  title: z.string().trim().min(1, "Milestone title is required.").max(200, "Milestone title is too long."),
   description: z
     .string()
     .trim()
-    .max(4000, "Description is too long")
+    .max(4000, "Description is too long.")
     .optional()
     .nullable()
     .transform((value) => value || null),

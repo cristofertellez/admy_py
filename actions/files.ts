@@ -1,7 +1,7 @@
 "use server";
 
 import { getUser, requirePermission } from "@/lib/auth";
-import { FilesService, FILE_CATEGORIES, resolveFileProjectId, toActivityEntity } from "@/features/files";
+import { FilesService, resolveFileProjectId, toActivityEntity } from "@/features/files";
 import { notifyFileUploaded } from "@/features/notifications";
 import { ActivityService } from "@/services/activity.service";
 import { hasFullAccess } from "@/lib/roles";
@@ -115,29 +115,6 @@ export async function deleteFile(fileId: string) {
 // ============================================================
 // Épica 10 — categorías, mover, versionado, restaurar, compartir
 // ============================================================
-
-export async function updateFileCategory(fileId: string, category: string) {
-  const user = await requirePermission("files.upload");
-  try {
-    if (!FILE_CATEGORIES.includes(category as never)) {
-      return { error: "Invalid category." };
-    }
-    const updated = await FilesService.updateMetadata(fileId, { category });
-
-    await ActivityService.log({
-      user_id: user.id,
-      action: "changed_file_category",
-      entity: toActivityEntity(String(updated.entity_type)),
-      entity_id: String(updated.entity_id),
-      new_value: { category },
-    });
-
-    revalidatePath("/dashboard/files", "layout");
-    return { success: "Category updated." };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to update category." };
-  }
-}
 
 export async function moveFile(fileId: string, entityType: string, entityId: string) {
   const user = await requirePermission("files.upload");

@@ -6,11 +6,6 @@ import { PreferencesService } from "@/features/preferences";
 import { ActivityService } from "@/services/activity.service";
 import { updatePreferencesSchema } from "@/schemas/preferences";
 
-export async function getMyPreferences() {
-  const user = await requireAuth();
-  return PreferencesService.get(user.id);
-}
-
 function parseDashboardPreferences(raw: FormDataEntryValue | null): { ok: true; value: unknown } | { ok: false } {
   if (typeof raw !== "string" || raw.trim() === "") {
     return { ok: true, value: {} };

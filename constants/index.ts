@@ -1,19 +1,12 @@
 export const APP_NAME = "AdmiPy";
 export const APP_DESCRIPTION =
   "Professional platform for project planning, tracking, collaboration and visualization.";
-export const APP_VERSION = "0.1.0";
 
 export const PAGINATION = {
   DEFAULT_PAGE: 1,
   DEFAULT_PAGE_SIZE: 20,
   PAGE_SIZE_OPTIONS: [10, 20, 50, 100] as const,
 };
-
-export const ROLES = {
-  DEVELOPER: "Developer",
-  CLIENT: "Client",
-  INTERMEDIARY: "Intermediary",
-} as const;
 
 export const PROJECT_STATUSES = {
   PROPOSED: "Proposed",
@@ -102,11 +95,6 @@ export const MILESTONE_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
   Cancelled: ["Pending"],
 };
 
-export const MILESTONE_STATUS_OPTIONS = Object.values(MILESTONE_STATUSES).map((value) => ({
-  value,
-  label: value,
-}));
-
 export const PRIORITIES = {
   VERY_LOW: "Very Low",
   LOW: "Low",
@@ -153,6 +141,8 @@ export const TAG_COLOR_OPTIONS = [
 
 export const DEFAULT_TAG_COLOR = TAG_COLOR_OPTIONS[0];
 
+// Maximum number of tags per project (Historia 6.10), enforced by the shared
+// project schema so every entry point applies the same limit.
 export const MAX_TAGS_PER_PROJECT = 20;
 
 export const FILE_TYPES_ALLOWED = [

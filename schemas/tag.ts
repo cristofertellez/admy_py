@@ -1,21 +1,17 @@
 import { z } from "zod";
 import { DEFAULT_TAG_COLOR, TAG_COLOR_OPTIONS } from "@/constants";
-
-const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+import { hexColor } from "./shared";
 
 // Colors are restricted to the shared tag palette so every chip stays inside
 // the design system (Historia 6.10).
-const paletteColor = z
-  .string()
-  .trim()
-  .regex(HEX_COLOR_PATTERN, "Invalid color format.")
+const paletteColor = hexColor
   .refine((value) => (TAG_COLOR_OPTIONS as readonly string[]).includes(value.toUpperCase()), {
     message: "Color must be selected from the tag palette.",
   })
   .transform((value) => value.toUpperCase());
 
 export const tagSchema = z.object({
-  name: z.string().trim().min(1, "Tag name is required").max(50, "Tag name is too long"),
+  name: z.string().trim().min(1, "Tag name is required.").max(50, "Tag name is too long."),
   color: paletteColor.default(DEFAULT_TAG_COLOR),
 });
 

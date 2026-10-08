@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { query, queryOne, newId } from "@/lib/turso/client";
 import { hashPassword, generateResetToken } from "@/lib/auth/password";
 import { ActivityService } from "@/services/activity.service";
-import { loginSchema, registerSchema, forgotPasswordSchema, resetPasswordSchema } from "@/schemas/auth";
+import { loginSchema, forgotPasswordSchema, resetPasswordSchema } from "@/schemas/auth";
 import { SettingsService } from "@/features/settings";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -87,58 +87,6 @@ export async function login(_prevState: unknown, formData: FormData) {
   const defaultPage = await SettingsService.getValue("default_page");
   const target = typeof defaultPage === "string" && defaultPage.startsWith("/") ? defaultPage : "/dashboard";
   redirect(target);
-}
-
-export async function signup(_prevState: unknown, formData: FormData) {
-  const parsed = registerSchema.safeParse({
-    first_name: formData.get("first_name"),
-    last_name: formData.get("last_name"),
-    email: formData.get("email"),
-    password: formData.get("password"),
-    confirm_password: formData.get("confirm_password"),
-  });
-
-  if (!parsed.success) {
-    const fieldErrors = parsed.error.flatten().fieldErrors;
-    return { error: Object.values(fieldErrors).flat()[0] || "Invalid data." };
-  }
-
-  const existing = await queryOne<{ id: string }>(
-    `SELECT id FROM users WHERE lower(email) = lower(?) LIMIT 1`,
-    [parsed.data.email],
-  );
-
-  if (existing) {
-    return { error: "A user with this email already exists." };
-  }
-
-  const role = await queryOne<{ id: string }>(
-    `SELECT id FROM roles WHERE name = 'Client' LIMIT 1`,
-  );
-
-  if (!role) {
-    return { error: "Default role not configured. Contact an administrator." };
-  }
-
-  try {
-    await query(
-      `INSERT INTO users (id, first_name, last_name, email, password_hash, role_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        newId(),
-        parsed.data.first_name,
-        parsed.data.last_name,
-        parsed.data.email,
-        hashPassword(parsed.data.password),
-        role.id,
-      ],
-    );
-  } catch (error) {
-    console.error("signup failed", error);
-    return { error: "Failed to create user." };
-  }
-
-  redirect("/login?registered=true");
 }
 
 export async function logout() {

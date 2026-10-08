@@ -19,10 +19,6 @@ const formActions: Record<string, FormAction> = {
   "project.update": updateProject,
 };
 
-export function isReplayableAction(type: string): boolean {
-  return type in formActions;
-}
-
 export async function executePendingAction(action: PendingAction): Promise<void> {
   const formAction = formActions[action.type];
   if (!formAction) {

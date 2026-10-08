@@ -7,11 +7,11 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const BUCKETS = ["avatars", "projects", "attachments", "logos", "exports"] as const;
-export type Bucket = (typeof BUCKETS)[number];
+type Bucket = (typeof BUCKETS)[number];
 
 let client: S3Client | null = null;
 
-export function getR2Client(): S3Client {
+function getR2Client(): S3Client {
   if (!client) {
     const accountId = process.env.R2_ACCOUNT_ID;
     const accessKeyId = process.env.R2_ACCESS_KEY_ID;

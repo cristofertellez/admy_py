@@ -8,6 +8,7 @@ import { TasksService } from "@/features/tasks";
 import { MilestonesService } from "@/features/milestones";
 import { publish } from "@/lib/events/bus";
 import { clientSchema } from "@/schemas";
+import { dateString } from "@/schemas/shared";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import * as XLSX from "xlsx";
@@ -20,7 +21,7 @@ import * as XLSX from "xlsx";
 
 export type ImportEntity = "clients" | "projects" | "tasks" | "milestones";
 
-export interface ImportRowResult {
+interface ImportRowResult {
   row: number;
   status: "valid" | "error";
   summary: string;
@@ -186,7 +187,7 @@ const taskImportSchema = z.object({
 const milestoneImportSchema = z.object({
   project: z.string().min(2),
   title: z.string().min(2),
-  estimated_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD."),
+  estimated_date: dateString,
   status: z.string().min(2).optional(),
 });
 

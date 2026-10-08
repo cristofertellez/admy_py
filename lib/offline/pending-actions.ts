@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PENDING_ACTION_TYPES = [
+const PENDING_ACTION_TYPES = [
   "project-comment.create",
   "task-comment.create",
   "task.update",
@@ -142,7 +142,7 @@ export function countPendingActions(): number {
   return getSnapshot().length;
 }
 
-export function validatePendingActionPayload(
+function validatePendingActionPayload(
   type: PendingActionType,
   payload: Record<string, unknown>,
 ): { success: true; data: Record<string, string> } | { success: false; error: string } {
@@ -183,12 +183,6 @@ export function enqueuePendingAction(
 
 export function removePendingAction(id: string): void {
   cache = getSnapshot().filter((action) => action.id !== id);
-  persist();
-  notify();
-}
-
-export function clearPendingActions(): void {
-  cache = EMPTY_ACTIONS;
   persist();
   notify();
 }

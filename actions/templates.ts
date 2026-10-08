@@ -6,7 +6,7 @@ import { TemplatesService } from "@/features/templates";
 import { templateSchema, type TemplateInput } from "@/schemas/template";
 import { ActivityService } from "@/services/activity.service";
 
-export interface TemplateActionResult {
+interface TemplateActionResult {
   success?: string;
   error?: string;
 }

@@ -1,6 +1,6 @@
 import { Badge } from "@/components/shared/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/shared/card";
-import { formatDateTime } from "@/utils";
+import { formatDateTime } from "@/lib/utils";
 import type { RecentLogin } from "@/features/dashboard";
 
 interface RecentLoginsProps {

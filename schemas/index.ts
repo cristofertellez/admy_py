@@ -5,6 +5,7 @@ export * from "./notifications";
 export * from "./preferences";
 export * from "./project";
 export * from "./settings";
+export * from "./shared";
 export * from "./tag";
 export * from "./task";
 export * from "./template";

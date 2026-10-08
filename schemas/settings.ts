@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hexColor } from "./shared";
 import {
   getSettingsForCategory,
   getSettingDefinition,
@@ -11,10 +12,6 @@ const catalogItemSchema = z.object({
   label: z.string().trim().min(1, "Label is required."),
   color: z.string().optional(),
 });
-
-const hexColorSchema = z
-  .string()
-  .regex(/^#[0-9A-Fa-f]{6}$/, "Enter a valid hex color.");
 
 function fieldSchema(definition: SettingDefinition): z.ZodTypeAny {
   const { type, min, max } = definition;
@@ -33,7 +30,7 @@ function fieldSchema(definition: SettingDefinition): z.ZodTypeAny {
     case "url":
       return z.string().url("Enter a valid URL.").or(z.literal(""));
     case "color":
-      return hexColorSchema;
+      return hexColor;
     case "catalog":
       return z.array(catalogItemSchema);
     case "select": {
@@ -72,7 +69,7 @@ export function validateSettingValue(
   return { ok: true, value: result.data };
 }
 
-export const settingsUpdateResponse = z.discriminatedUnion("ok", [
+const settingsUpdateResponse = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), message: z.string() }),
   z.object({ ok: z.literal(false), message: z.string() }),
 ]);

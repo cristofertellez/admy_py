@@ -4,6 +4,7 @@ import { Providers } from "./providers";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { getUser } from "@/lib/auth";
 import { SettingsService } from "@/features/settings";
+import { APP_NAME, APP_DESCRIPTION } from "@/constants";
 import "./globals.css";
 
 const inter = Inter({
@@ -20,15 +21,15 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | AdmiPy",
-    default: "AdmiPy — Project Management Platform",
+    template: `%s | ${APP_NAME}`,
+    default: `${APP_NAME} — Project Management Platform`,
   },
-  description: "Professional platform for project planning, tracking, collaboration and visualization.",
+  description: APP_DESCRIPTION,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "AdmiPy",
+    title: APP_NAME,
   },
   icons: {
     icon: [

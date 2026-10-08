@@ -9,7 +9,7 @@ import type { ApiKeyScope } from "@/features/api-keys";
 // Bearer key authentication, per-key rate limiting and the standard JSON
 // envelope with pagination metadata.
 
-export const API_RATE_LIMIT_PER_MINUTE = 60;
+const API_RATE_LIMIT_PER_MINUTE = 60;
 
 interface RateWindow {
   count: number;
@@ -18,7 +18,7 @@ interface RateWindow {
 
 const rateWindows = new Map<string, RateWindow>();
 
-export function isRateLimited(keyId: string, limit = API_RATE_LIMIT_PER_MINUTE): boolean {
+function isRateLimited(keyId: string, limit = API_RATE_LIMIT_PER_MINUTE): boolean {
   const now = Date.now();
   const window = rateWindows.get(keyId);
 
@@ -35,7 +35,7 @@ export function apiError(status: number, message: string): NextResponse {
   return NextResponse.json({ error: message }, { status });
 }
 
-export interface ApiAuthResult {
+interface ApiAuthResult {
   profile: SessionProfile;
   scopes: ApiKeyScope[];
   keyId: string;

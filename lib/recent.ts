@@ -3,7 +3,7 @@
 // while this lightweight history enables quick offline navigation to the
 // pages the Service Worker has already cached.
 
-export interface RecentItem {
+interface RecentItem {
   type: "project" | "task";
   id: string;
   title: string;

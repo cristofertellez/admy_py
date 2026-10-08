@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { NOTIFICATION_TYPES } from "@/features/notifications/notifications.service";
+import { timeString } from "./shared";
 
 const notificationTypeSchema = z.enum(
   NOTIFICATION_TYPES as [string, ...string[]],
@@ -19,15 +20,11 @@ export const notificationPreferencesSchema = z.object({
     .optional()
     .transform((value) => value === "on"),
   email_frequency: z.enum(["instant", "daily", "weekly"]).default("instant"),
-  quiet_hours_start: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM format.")
+  quiet_hours_start: timeString
     .or(z.literal(""))
     .nullable()
     .transform((value) => (value ? value : null)),
-  quiet_hours_end: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM format.")
+  quiet_hours_end: timeString
     .or(z.literal(""))
     .nullable()
     .transform((value) => (value ? value : null)),

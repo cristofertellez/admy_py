@@ -8,14 +8,14 @@ import {
   type PendingAction,
 } from "./pending-actions";
 
-export interface PendingActionsFlushResult {
+interface PendingActionsFlushResult {
   executed: boolean;
   synced: number;
   failed: number;
   conflicted: number;
 }
 
-export const EMPTY_FLUSH_RESULT: PendingActionsFlushResult = {
+const EMPTY_FLUSH_RESULT: PendingActionsFlushResult = {
   executed: false,
   synced: 0,
   failed: 0,
@@ -40,10 +40,6 @@ function classifySyncFailure(error: string): "transient" | "conflict" {
 }
 
 let flushInFlight = false;
-
-export function isFlushingPendingActions(): boolean {
-  return flushInFlight;
-}
 
 /**
  * Replays pending actions in FIFO order. Conflicted actions are skipped
