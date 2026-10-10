@@ -4,13 +4,14 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { cn } from "@/lib/utils";
 
-export type TaskViewMode = "list" | "kanban" | "calendar" | "timeline";
+export type TaskViewMode = "list" | "kanban" | "calendar" | "timeline" | "gantt";
 
 const VIEW_OPTIONS: { id: TaskViewMode; label: string }[] = [
   { id: "list", label: "List" },
   { id: "kanban", label: "Kanban" },
   { id: "calendar", label: "Calendar" },
   { id: "timeline", label: "Timeline" },
+  { id: "gantt", label: "Gantt" },
 ];
 
 /** Historia 7.13/7.15/7.16 — view mode lives in the URL (shareable). */

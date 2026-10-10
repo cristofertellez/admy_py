@@ -39,7 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <DashboardSidebar role={user.role} userId={user.id} />
         <ConnectivityIndicator />
         <NotificationsBell unreadCount={unreadCount} />
-        <DashboardHeaderActions />
+        <DashboardHeaderActions user={user} />
       </Header>
       <main className="pt-16 lg:pl-64">
         <OfflineBanner />

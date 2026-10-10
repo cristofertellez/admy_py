@@ -18,6 +18,7 @@ import {
 import { useEffect, useState } from "react";
 import { DataTablePagination } from "./data-table-pagination";
 import { DataTableToolbar } from "./data-table-toolbar";
+import { EmptyState } from "@/components/shared/empty-state";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -176,8 +177,15 @@ export function DataTable<TData, TValue>({
               ))
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-16 text-center text-body-sm text-muted-soft">
-                  No results found.
+                <td colSpan={columns.length} className="p-8">
+                  <EmptyState
+                    title="No se encontraron resultados"
+                    description={
+                      searchValue
+                        ? `No hay elementos que coincidan con "${searchValue}". Intenta con otro término.`
+                        : "No hay registros disponibles en esta vista."
+                    }
+                  />
                 </td>
               </tr>
             ) : (
@@ -185,12 +193,12 @@ export function DataTable<TData, TValue>({
                 <tr
                   key={row.id}
                   className={cn(
-                    "border-b border-hairline-soft transition-colors hover:bg-surface-card",
+                    "border-b border-hairline-soft transition-colors hover:bg-surface-card-elevated/40",
                     row.getIsSelected() && "bg-primary/10",
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-body-sm">
+                    <td key={cell.id} className="px-4 py-3 text-body-sm text-body">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

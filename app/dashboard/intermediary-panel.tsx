@@ -53,7 +53,14 @@ export function IntermediaryPanel({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {widgets.map((widget) => widgetById[widget.id] ?? null)}
+        {widgets.map((widget) => {
+          const node = widgetById[widget.id];
+          return node ? (
+            <div key={widget.id} className="min-w-0">
+              {node}
+            </div>
+          ) : null;
+        })}
       </div>
     </div>
   );

@@ -23,7 +23,7 @@ export async function query<T = Record<string, unknown>>(
   args: InValue[] = [],
 ): Promise<T[]> {
   const result = await getTursoClient().execute({ sql, args });
-  return result.rows as unknown as T[];
+  return result.rows.map((row) => ({ ...row })) as unknown as T[];
 }
 
 export async function queryOne<T = Record<string, unknown>>(

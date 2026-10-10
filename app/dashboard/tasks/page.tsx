@@ -11,6 +11,7 @@ import { TasksViewSwitcher, type TaskViewMode } from "./view-switcher";
 import { KanbanTasks } from "./kanban-tasks";
 import { TasksCalendar } from "./tasks-calendar";
 import { TasksTimeline } from "./tasks-timeline";
+import { TasksGantt } from "./tasks-gantt";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Tasks" };
@@ -22,6 +23,7 @@ const PROJECT_OPTIONS_LIMIT = 200;
 // Historia 7.1 — Administración de Tareas. Search, filters, sorting and page
 // live in the URL so views are shareable and the PWA can restore them offline.
 // Historias 7.13/7.15/7.16 — list, kanban, calendar and timeline views.
+// Roadmap v2 — visual interactive Gantt with SVG dependency graph.
 interface TasksPageProps {
   searchParams: Promise<{
     search?: string;
@@ -43,7 +45,7 @@ function pickOption<T extends string>(value: string | undefined, options: { valu
 
 const SORT_OPTIONS = Object.keys(TASK_SORTABLE_COLUMNS).map((key) => ({ value: key, label: key }));
 
-const VIEW_MODES: TaskViewMode[] = ["list", "kanban", "calendar", "timeline"];
+const VIEW_MODES: TaskViewMode[] = ["list", "kanban", "calendar", "timeline", "gantt"];
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export default async function TasksPage({ searchParams }: TasksPageProps) {
@@ -104,7 +106,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
     archived: archivedView,
   });
 
-  const milestones =
+  const calendarMilestones =
     view === "calendar"
       ? await MilestonesService.getCalendarMilestones(
           Number(month.split("-")[0]),
@@ -113,8 +115,21 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         )
       : [];
 
+  const ganttMilestones =
+    view === "gantt"
+      ? project
+        ? await MilestonesService.listByProject(project)
+        : await MilestonesService.getUpcomingForScope(50)
+      : [];
+
+  const dependencies =
+    view === "gantt"
+      ? await TasksService.getDependenciesForTasks((tasks ?? []).map((t) => t.id))
+      : [];
+
   const taskRows = (tasks ?? []) as unknown as Array<{
     id: string;
+    project_id?: string | null;
     title: string;
     status: string;
     priority: string;
@@ -193,7 +208,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
             estimated_end: row.estimated_end,
             project_name: row.projects?.name ?? null,
           }))}
-          milestones={milestones.map((milestone) => ({
+          milestones={calendarMilestones.map((milestone) => ({
             id: milestone.id,
             title: milestone.title,
             status: milestone.status,
@@ -215,6 +230,31 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
             estimated_end: row.estimated_end,
             completion_percentage: row.completion_percentage,
             project_name: row.projects?.name ?? null,
+          }))}
+        />
+      )}
+
+      {view === "gantt" && (
+        <TasksGantt
+          tasks={taskRows.map((row) => ({
+            id: row.id,
+            title: row.title,
+            status: row.status,
+            priority: row.priority,
+            estimated_start: row.estimated_start,
+            estimated_end: row.estimated_end,
+            completion_percentage: row.completion_percentage,
+            project_id: row.project_id ?? null,
+            project_name: row.projects?.name ?? null,
+            assignee_name: assigneeName(row),
+          }))}
+          dependencies={dependencies}
+          milestones={ganttMilestones.map((milestone) => ({
+            id: milestone.id,
+            title: milestone.title,
+            status: milestone.status,
+            estimated_date: milestone.estimated_date,
+            project_name: "project_name" in milestone ? (milestone.project_name as string) : null,
           }))}
         />
       )}

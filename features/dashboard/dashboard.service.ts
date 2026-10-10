@@ -220,6 +220,23 @@ export interface DashboardAtRiskProject {
   reasons: string[];
 }
 
+export interface DashboardRecentProject {
+  id: string;
+  name: string;
+  status: string;
+  estimated_end_date: string | null;
+}
+
+export interface DashboardTeamMember {
+  id: string;
+  user_id?: string;
+  first_name: string;
+  last_name: string;
+  avatar: string | null;
+  task_title: string;
+  task_status: string;
+}
+
 export interface DeveloperDashboardData {
   stats: DashboardStats;
   overdueTasks: number;
@@ -230,6 +247,8 @@ export interface DeveloperDashboardData {
   recentFiles: RecentFileItem[];
   recentActivity: ActivityLog[];
   activeIntermediaries: number;
+  recentProjects?: DashboardRecentProject[];
+  teamCollaboration?: DashboardTeamMember[];
 }
 
 export interface ClientDashboardProject {
@@ -667,6 +686,8 @@ export class DashboardService {
       recentFiles,
       activity,
       activeIntermediaries,
+      recentProjects,
+      teamCollaboration,
     ] = await Promise.all([
       DashboardService.getDeveloperStats(filters),
       countRows(
@@ -717,6 +738,21 @@ export class DashboardService {
          JOIN roles r ON r.id = u.role_id
          WHERE r.name = 'Intermediary' AND u.deleted_at IS NULL AND u.is_active = 1`,
       ),
+      query<DashboardRecentProject>(
+        `SELECT id, name, status, estimated_end_date
+         FROM projects
+         WHERE deleted_at IS NULL AND is_active = 1
+         ORDER BY created_at DESC
+         LIMIT 5`,
+      ),
+      query<DashboardTeamMember>(
+        `SELECT t.id, u.id AS user_id, u.first_name, u.last_name, u.avatar, t.title AS task_title, t.status AS task_status
+         FROM tasks t
+         JOIN users u ON u.id = t.assigned_to
+         WHERE t.deleted_at IS NULL AND t.is_active = 1
+         ORDER BY t.updated_at DESC
+         LIMIT 4`,
+      ),
     ]);
 
     const atRiskProjects = atRiskRows
@@ -734,6 +770,8 @@ export class DashboardService {
       recentFiles,
       recentActivity: activity.data,
       activeIntermediaries,
+      recentProjects,
+      teamCollaboration,
     };
   }
 

@@ -1,2 +1,2 @@
 export { TasksService } from "./tasks.service";
-export type { TaskWithRelations } from "./tasks.types";
+export type { TaskWithRelations, TaskDependencyItem } from "./tasks.types";

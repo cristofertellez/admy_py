@@ -6,3 +6,4 @@ export { CommentsCard } from "./comments-card";
 export { DueSoonCard } from "./due-soon-card";
 export { FilesCard } from "./files-card";
 export { AtRiskProjectsCard } from "./at-risk-card";
+export { DonezoDashboard } from "./donezo-dashboard";

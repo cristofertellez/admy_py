@@ -5,7 +5,12 @@ export type {
   NotificationListFilters,
   NotificationPreferences,
 } from "./notifications.service";
-export { EmailService } from "./email.service";
+export {
+  EmailService,
+  ConsoleTransport,
+  SmtpTransport,
+} from "./email.service";
+export type { EmailMessage, EmailTransport } from "./email.service";
 export {
   notifyProjectUpdated,
   notifyProjectCreated,

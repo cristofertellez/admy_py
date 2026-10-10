@@ -447,4 +447,25 @@ export class TasksService {
 
     return rows;
   }
+
+  /**
+   * Roadmap v2 — Fetches all dependencies involving the specified task IDs
+   * for visual Gantt and dependency graph rendering.
+   */
+  static async getDependenciesForTasks(taskIds: string[]) {
+    if (taskIds.length === 0) return [];
+    const uniqueIds = Array.from(new Set(taskIds)).slice(0, 500);
+    const placeholders = uniqueIds.map(() => "?").join(", ");
+    return query<{
+      id: string;
+      task_id: string;
+      depends_on_task_id: string;
+      dependency_type: string;
+    }>(
+      `SELECT id, task_id, depends_on_task_id, dependency_type
+       FROM task_dependencies
+       WHERE task_id IN (${placeholders}) OR depends_on_task_id IN (${placeholders})`,
+      [...uniqueIds, ...uniqueIds],
+    );
+  }
 }

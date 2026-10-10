@@ -723,8 +723,8 @@ export class NotificationsService {
     cutoff.setDate(cutoff.getDate() - REMINDER_COMMENT_UNANSWERED_DAYS);
     const cutoffKey = toLocalDateKey(cutoff);
 
-    const comments = await query<{ id: string; project_id: string; content: string; user_id: string }>(
-      `SELECT pc.id, pc.project_id, pc.content, pc.user_id
+    const comments = await query<{ id: string; project_id: string; message: string; user_id: string }>(
+      `SELECT pc.id, pc.project_id, pc.message, pc.user_id
        FROM project_comments pc
        JOIN projects p ON p.id = pc.project_id
        WHERE pc.parent_comment_id IS NULL
@@ -747,7 +747,7 @@ export class NotificationsService {
         const inserted = await NotificationsService.create({
           receiver_id: receiverId,
           title: "Comment awaiting response",
-          message: `A comment on "${comment.content.slice(0, 80)}..." has no replies yet.`,
+          message: `A comment on "${comment.message.slice(0, 80)}..." has no replies yet.`,
           type: "reminder",
           entity_type: "Project",
           entity_id: comment.project_id,

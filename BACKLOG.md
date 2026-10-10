@@ -1,4 +1,4 @@
-﻿# BACKLOG.md
+# BACKLOG.md
 
 # Sistema de Gestión, Control y Visualización de Proyectos
 
@@ -176,6 +176,7 @@ Preparación para producción
 - [x] Épica 17 — API pública v1 read-only (proyectos/tareas/clientes/hitos + OpenAPI + rate limiting + API keys hasheadas con UI en `/dashboard/integrations`), webhooks firmados con cola de reintentos e historial, bus de eventos internos (`system_events` + `after()`), reglas de automatización, feed ICS de calendario, importación CSV de clientes/proyectos con validación en dos fases, exportación global ZIP, `/api/health` y `docs/ROADMAP.md` (v2–v4)
 - [x] Cierre de pendientes accionables: lockout de cuenta con `login_max_attempts`/`auto_lock_minutes` (migración 00014, 16.13), filtro por proyecto en el Activity Log y en notificaciones (13.7/13.10/16.9), consulta limitada del log para Administrator (16.14), filtro por intermediario en el dashboard (11.12), sincronización en segundo plano desactivable (14.13), importación de tareas/hitos + formato Excel (17.10), auditoría `automation_executed` (17.16), avatares locales con `next/image` (14.10) y métricas de latencia/errores de la API en `/api/health` (17.12)
 - [x] Limpieza y documentación: código muerto eliminado (barrels huérfanos `actions/index.ts`, `components/{pwa,shared,tables}/index.ts`; acciones sin uso `signup`, `getSettings`/`updateSetting`, `getTags`, `getMyPreferences`, `getGlobalReport`/`getReportFilterOptions`, `getTimeEntries`, `updateFileCategory`, `restoreCommentAction`+`CommentsService.restoreComment`, `getCurrentRole`; constantes `ROLES`, `MILESTONE_STATUS_OPTIONS`, `APP_VERSION`; `isFlushingPendingActions`, `isReplayableAction`, `clearPendingActions`; tipos `EntityType`/`BaseEntity`/`Attachment`), ~25 exports internos des-publicados, `APP_NAME`/`APP_DESCRIPTION` conectados a los metadatos del layout (antes hardcodeados), `npm run lint` ampliado a todo el código fuente, dependencia `@tanstack/query-async-storage-persister` sin uso eliminada; README/CONTRIBUTING/ARCHITECTURE actualizados a la estructura real (incluye subsistemas de integración, PWA offline y exportaciones); esquemas Zod homogeneizados con primitivas compartidas en `schemas/shared.ts` (`optionalDate`/`dateString`/`optionalUuid`/`optionalText`/`timeString`/`hexColor`) y mensajes de validación con puntuación uniforme. Se conservan `PermissionGuard` (2.10 pendiente), hooks de resolución de conflictos offline `retryPendingAction`/`discardPendingAction` (hallazgo 14.4-A), funciones puras de indicadores/predicados de estado (seams de testing) y la arquitectura de email preparada (13.3)
+- [x] Roadmap v2 — Diagrama de Gantt Interactivo (`/dashboard/tasks?view=gantt`): vista Gantt completa con curvas SVG dinámicas y flechas dirigidas para dependencias `task_dependencies`, detección visual de conflictos de desfase (líneas discontinuas en rojo si el predecesor termina tras el inicio del sucesor), zoom temporal por días/semanas/meses, agrupamiento dinámico (por proyecto/por estado con acordeón de grupos), botón "Hoy" con marcador vertical en tiempo real, resaltado reactivo al pasar el cursor (cadena de bloqueadores/sucesores), tarjeta modal de inspección de tarea con predecesores y sucesores, y cajón para tareas sin fechas estimadas.
 
 ---
 
@@ -6280,17 +6281,15 @@ Configuración
 - [x] Desactivar
 - [x] Personalizar frecuencia
 
-Implementación: `EmailService` (features/notifications) define la arquitectura de transporte con `ConsoleTransport`: hasta que se configure un proveedor SMTP (variables SMTP_*), los correos se registran en log — sin dependencias externas (AGENTS.md). `dispatchEmailSideChannel` respeta la preferencia de canal, la frecuencia (instant/digest) y las horas silenciosas de cada usuario; la activación/desactivación y frecuencia viven en las preferencias de notificación (13.6).
+Implementación: `EmailService` (features/notifications) implementa una arquitectura desacoplada con doble transporte: si `SMTP_HOST` está configurado en `.env.local`, se activa `SmtpTransport` (Nodemailer) para entrega real por SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`) compatible con cualquier proveedor (Resend, AWS SES, Mailtrap, SendGrid, etc.). Si no está configurado, conmuta automáticamente a `ConsoleTransport` (log de desarrollo). Genera versiones en texto plano y HTML responsive sanitizado, respeta horas silenciosas y frecuencias (instant/digest), y captura fallos de transporte sin interrumpir las mutaciones de la plataforma.
 
 Estado
 
-In Progress
+Done
 
 Prioridad
 
 P1
-
-Nota: el transporte SMTP real (Resend/SES/Nodemailer) queda pendiente de proveedor; la interfaz permite conectarlo sin tocar los call sites.
 
 ---
 
@@ -8393,7 +8392,7 @@ Documentar futuras versiones.
 
 Versión 2
 
-- Gantt
+- [x] Gantt interactivo con dependencias SVG visuales, conflictos y zoom (`/dashboard/tasks?view=gantt`)
 - Dependencias avanzadas
 - Automatizaciones
 

@@ -4,22 +4,19 @@ import {
   ActivityCard,
   AtRiskProjectsCard,
   CommentsCard,
+  DonezoDashboard,
   FilesCard,
-  KpiCard,
   MilestonesCard,
 } from "@/components/dashboard";
 import type { DeveloperDashboardData } from "@/features/dashboard";
 
-// Historia 11.2 / 11.11 — Dashboard del Developer: the most complete panel of
-// the platform. Widgets render in the user's saved order (personalizable);
-// the KPI row always stays visible.
-
 interface DeveloperPanelProps {
   data: DeveloperDashboardData;
   widgets: { id: string; label: string }[];
+  filterSlot?: React.ReactNode;
 }
 
-export function DeveloperPanel({ data, widgets }: DeveloperPanelProps) {
+export function DeveloperPanel({ data, widgets, filterSlot }: DeveloperPanelProps) {
   const { stats } = data;
 
   const taskData = [
@@ -70,22 +67,27 @@ export function DeveloperPanel({ data, widgets }: DeveloperPanelProps) {
     recentFiles: <FilesCard key="recentFiles" files={data.recentFiles} />,
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <KpiCard href="/dashboard/projects" value={stats.activeProjects} label="Active Projects" tone="primary" />
-        <KpiCard value={data.atRiskProjects.length} label="Projects at Risk" tone={data.atRiskProjects.length > 0 ? "danger" : "success"} />
-        <KpiCard href="/dashboard/tasks" value={data.overdueTasks} label="Overdue Tasks" tone={data.overdueTasks > 0 ? "danger" : "default"} />
-        <KpiCard href="/dashboard/tasks" value={stats.pendingTasks} label="Pending Tasks" />
-        <KpiCard href="/dashboard/projects" value={stats.completedProjects} label="Completed Projects" tone="success" />
-        <KpiCard href="/dashboard/projects" value={stats.delayedProjects} label="Delayed Projects" tone={stats.delayedProjects > 0 ? "warning" : "default"} />
-        <KpiCard href="/dashboard/clients" value={stats.activeClients} label="Active Clients" tone="cyan" />
-        <KpiCard href="/dashboard/intermediaries" value={data.activeIntermediaries} label="Active Intermediaries" tone="violet" />
-      </div>
+  const hasAdditionalWidgets = widgets && widgets.length > 0;
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {widgets.map((widget) => widgetById[widget.id] ?? null)}
-      </div>
-    </div>
+  return (
+    <DonezoDashboard
+      data={data}
+      filterSlot={filterSlot}
+      additionalWidgetsSlot={
+        hasAdditionalWidgets ? (
+          <div className="grid gap-6 lg:grid-cols-3">
+            {widgets.map((widget) => {
+              const node = widgetById[widget.id];
+              return node ? (
+                <div key={widget.id} className="min-w-0">
+                  {node}
+                </div>
+              ) : null;
+            })}
+          </div>
+        ) : undefined
+      }
+    />
   );
 }
+

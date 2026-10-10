@@ -155,14 +155,5 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const panel = await DashboardService.getDeveloperDashboard(filters);
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-display-sm text-ink">Welcome, {user.first_name}</h1>
-        <p className="mt-1 text-body-sm text-muted">Here's an overview of the platform.</p>
-      </div>
-      {toolbar}
-      <DeveloperPanel data={panel} widgets={widgets} />
-    </div>
-  );
+  return <DeveloperPanel data={panel} widgets={widgets} filterSlot={toolbar} />;
 }

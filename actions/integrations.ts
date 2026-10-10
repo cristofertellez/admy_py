@@ -2,18 +2,29 @@
 
 import { requirePermission } from "@/lib/auth";
 import { ActivityService } from "@/services/activity.service";
-import { ApiKeysService, API_KEY_SCOPES, type ApiKeyScope } from "@/features/api-keys";
-import { WebhooksService, WEBHOOK_EVENT_TYPES } from "@/features/webhooks";
+import { ApiKeysService, type ApiKeyScope } from "@/features/api-keys";
+import { WebhooksService } from "@/features/webhooks";
 import {
   AutomationsService,
-  AUTOMATION_ACTIONS,
-  AUTOMATION_EVENTS,
   type AutomationAction,
+  type AutomationRuleConfig,
+  type AutomationTestResult,
 } from "@/features/automations";
+import {
+  createApiKeySchema,
+  createWebhookSchema,
+  updateWebhookSchema,
+  createAutomationSchema,
+  updateAutomationSchema,
+} from "@/schemas/integrations";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
-type ActionState = { success?: string; error?: string; secret?: string };
+export type ActionState = {
+  success?: string;
+  error?: string;
+  secret?: string;
+  data?: unknown;
+};
 
 function revalidateIntegrations() {
   revalidatePath("/dashboard/integrations");
@@ -23,11 +34,6 @@ function revalidateIntegrations() {
 // Historia 17.2 — API keys
 // ============================================================
 
-const createApiKeySchema = z.object({
-  name: z.string().min(3, "Name must have at least 3 characters.").max(60),
-  scopes: z.array(z.enum(API_KEY_SCOPES)).min(1, "Select at least one scope."),
-});
-
 export async function createApiKey(_prevState: ActionState | null, formData: FormData): Promise<ActionState> {
   const actor = await requirePermission("settings.update");
 
@@ -36,7 +42,7 @@ export async function createApiKey(_prevState: ActionState | null, formData: For
     scopes: formData.getAll("scopes").map(String).filter(Boolean),
   });
   if (!parsed.success) {
-    return { error: Object.values(parsed.error.flatten().fieldErrors).flat()[0] || "Invalid data." };
+    return { error: Object.values(parsed.error.flatten().fieldErrors).flat()[0] || "Datos inválidos." };
   }
 
   try {
@@ -55,10 +61,9 @@ export async function createApiKey(_prevState: ActionState | null, formData: For
     });
 
     revalidateIntegrations();
-    // The plaintext key is returned exactly once.
-    return { success: "API key created. Copy it now — it will not be shown again.", secret: key };
+    return { success: "API key creada exitosamente. Cópiala ahora, no volverá a mostrarse.", secret: key };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to create API key." };
+    return { error: err instanceof Error ? err.message : "Error al crear la API key." };
   }
 }
 
@@ -74,9 +79,9 @@ export async function revokeApiKey(id: string): Promise<ActionState> {
       entity_id: id,
     });
     revalidateIntegrations();
-    return { success: "API key revoked." };
+    return { success: "API key revocada." };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to revoke API key." };
+    return { error: err instanceof Error ? err.message : "Error al revocar la API key." };
   }
 }
 
@@ -92,26 +97,15 @@ export async function deleteApiKey(id: string): Promise<ActionState> {
       entity_id: id,
     });
     revalidateIntegrations();
-    return { success: "API key deleted." };
+    return { success: "API key eliminada." };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to delete API key." };
+    return { error: err instanceof Error ? err.message : "Error al eliminar la API key." };
   }
 }
 
 // ============================================================
 // Historia 17.3 — Webhooks
 // ============================================================
-
-const createWebhookSchema = z.object({
-  name: z.string().min(3, "Name must have at least 3 characters.").max(60),
-  url: z.string().url("Enter a valid https:// URL.").refine(
-    (value) => value.startsWith("https://"),
-    "Webhook URLs must use HTTPS.",
-  ),
-  events: z
-    .array(z.enum(WEBHOOK_EVENT_TYPES))
-    .min(1, "Subscribe to at least one event."),
-});
 
 export async function createWebhook(_prevState: ActionState | null, formData: FormData): Promise<ActionState> {
   const actor = await requirePermission("settings.update");
@@ -123,7 +117,7 @@ export async function createWebhook(_prevState: ActionState | null, formData: Fo
     events: events.length > 0 ? events : undefined,
   });
   if (!parsed.success) {
-    return { error: Object.values(parsed.error.flatten().fieldErrors).flat()[0] || "Invalid data." };
+    return { error: Object.values(parsed.error.flatten().fieldErrors).flat()[0] || "Datos inválidos." };
   }
 
   try {
@@ -143,9 +137,46 @@ export async function createWebhook(_prevState: ActionState | null, formData: Fo
     });
 
     revalidateIntegrations();
-    return { success: "Webhook created. Save the signing secret shown below.", secret };
+    return { success: "Webhook creado. Guarda el secreto de firma mostrado abajo.", secret };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to create webhook." };
+    return { error: err instanceof Error ? err.message : "Error al crear webhook." };
+  }
+}
+
+export async function updateWebhook(input: {
+  id: string;
+  name: string;
+  url: string;
+  events: string[];
+  active?: boolean;
+}): Promise<ActionState> {
+  const actor = await requirePermission("settings.update");
+
+  const parsed = updateWebhookSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: Object.values(parsed.error.flatten().fieldErrors).flat()[0] || "Datos inválidos." };
+  }
+
+  try {
+    await WebhooksService.update(parsed.data.id, {
+      name: parsed.data.name,
+      url: parsed.data.url,
+      events: parsed.data.events,
+      active: parsed.data.active,
+    });
+
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "updated_webhook",
+      entity: "Webhook",
+      entity_id: parsed.data.id,
+      new_value: { name: parsed.data.name, url: parsed.data.url, events: parsed.data.events },
+    });
+
+    revalidateIntegrations();
+    return { success: "Webhook actualizado correctamente." };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error al actualizar el webhook." };
   }
 }
 
@@ -161,9 +192,9 @@ export async function toggleWebhook(id: string, active: boolean): Promise<Action
       entity_id: id,
     });
     revalidateIntegrations();
-    return { success: active ? "Webhook activated." : "Webhook deactivated." };
+    return { success: active ? "Webhook activado." : "Webhook pausado." };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to update webhook." };
+    return { error: err instanceof Error ? err.message : "Error al cambiar estado del webhook." };
   }
 }
 
@@ -179,9 +210,38 @@ export async function deleteWebhook(id: string): Promise<ActionState> {
       entity_id: id,
     });
     revalidateIntegrations();
-    return { success: "Webhook deleted." };
+    return { success: "Webhook eliminado." };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to delete webhook." };
+    return { error: err instanceof Error ? err.message : "Error al eliminar el webhook." };
+  }
+}
+
+export async function testWebhookAction(id: string): Promise<ActionState> {
+  const actor = await requirePermission("settings.update");
+
+  try {
+    const result = await WebhooksService.testWebhook(id);
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "tested_webhook",
+      entity: "Webhook",
+      entity_id: id,
+      new_value: { success: result.success, statusCode: result.statusCode, latencyMs: result.latencyMs },
+    });
+
+    revalidateIntegrations();
+    if (result.success) {
+      return {
+        success: `Prueba exitosa (HTTP ${result.statusCode}, latencia ${result.latencyMs}ms).`,
+        data: result,
+      };
+    }
+    return {
+      error: `Fallo en prueba: ${result.error || `HTTP ${result.statusCode}`} (${result.latencyMs}ms).`,
+      data: result,
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error al probar webhook." };
   }
 }
 
@@ -191,39 +251,60 @@ export async function retryWebhookDeliveries(): Promise<ActionState> {
   try {
     await WebhooksService.retryPendingDeliveries();
     revalidateIntegrations();
-    return { success: "Pending deliveries retried." };
+    return { success: "Entregas pendientes reintentadas." };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to retry deliveries." };
+    return { error: err instanceof Error ? err.message : "Error al reintentar entregas." };
+  }
+}
+
+export async function retrySingleWebhookDelivery(deliveryId: string): Promise<ActionState> {
+  const actor = await requirePermission("settings.update");
+
+  try {
+    const result = await WebhooksService.retrySingleDelivery(deliveryId);
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "retried_webhook_delivery",
+      entity: "WebhookDelivery",
+      entity_id: deliveryId,
+      new_value: { success: result.success, statusCode: result.statusCode },
+    });
+
+    revalidateIntegrations();
+    if (result.success) {
+      return { success: `Entrega completada exitosamente (HTTP ${result.statusCode}).`, data: result };
+    }
+    return { error: `Reintento fallido: ${result.error || `HTTP ${result.statusCode}`}`, data: result };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error al reintentar la entrega." };
   }
 }
 
 // ============================================================
-// Historia 17.6 — Automation rules
+// Historia 17.6 — Automation rules (Editor de reglas: Disparador → Acción)
 // ============================================================
 
-const createAutomationSchema = z.object({
-  name: z.string().min(3, "Name must have at least 3 characters.").max(60),
-  event: z.enum(AUTOMATION_EVENTS),
-  action: z.enum(AUTOMATION_ACTIONS.map((option) => option.value) as [AutomationAction, ...AutomationAction[]]),
-});
-
-export async function createAutomation(_prevState: ActionState | null, formData: FormData): Promise<ActionState> {
+export async function createAutomation(
+  input: {
+    name: string;
+    event: string;
+    action: AutomationAction;
+    config?: AutomationRuleConfig;
+  },
+): Promise<ActionState> {
   const actor = await requirePermission("settings.update");
 
-  const parsed = createAutomationSchema.safeParse({
-    name: formData.get("name") ?? "",
-    event: formData.get("event") ?? "",
-    action: formData.get("action") ?? "",
-  });
+  const parsed = createAutomationSchema.safeParse(input);
   if (!parsed.success) {
-    return { error: Object.values(parsed.error.flatten().fieldErrors).flat()[0] || "Invalid data." };
+    return { error: Object.values(parsed.error.flatten().fieldErrors).flat()[0] || "Datos inválidos." };
   }
 
   try {
     const id = await AutomationsService.create({
       name: parsed.data.name,
       event: parsed.data.event,
-      action: parsed.data.action,
+      action: parsed.data.action as AutomationAction,
+      config: parsed.data.config,
       createdBy: actor.id,
     });
 
@@ -232,13 +313,64 @@ export async function createAutomation(_prevState: ActionState | null, formData:
       action: "created_automation",
       entity: "Automation",
       entity_id: id,
-      new_value: { name: parsed.data.name, event: parsed.data.event, action: parsed.data.action },
+      new_value: {
+        name: parsed.data.name,
+        event: parsed.data.event,
+        action: parsed.data.action,
+        config: parsed.data.config,
+      },
     });
 
     revalidateIntegrations();
-    return { success: "Automation rule created." };
+    return { success: "Regla de automatización creada exitosamente." };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to create automation." };
+    return { error: err instanceof Error ? err.message : "Error al crear la automatización." };
+  }
+}
+
+export async function updateAutomation(
+  input: {
+    id: string;
+    name: string;
+    event: string;
+    action: AutomationAction;
+    config?: AutomationRuleConfig;
+    active?: boolean;
+  },
+): Promise<ActionState> {
+  const actor = await requirePermission("settings.update");
+
+  const parsed = updateAutomationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: Object.values(parsed.error.flatten().fieldErrors).flat()[0] || "Datos inválidos." };
+  }
+
+  try {
+    await AutomationsService.update(parsed.data.id, {
+      name: parsed.data.name,
+      event: parsed.data.event,
+      action: parsed.data.action as AutomationAction,
+      config: parsed.data.config,
+      active: parsed.data.active,
+    });
+
+    await ActivityService.log({
+      user_id: actor.id,
+      action: "updated_automation",
+      entity: "Automation",
+      entity_id: parsed.data.id,
+      new_value: {
+        name: parsed.data.name,
+        event: parsed.data.event,
+        action: parsed.data.action,
+        config: parsed.data.config,
+      },
+    });
+
+    revalidateIntegrations();
+    return { success: "Regla de automatización actualizada exitosamente." };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error al actualizar la automatización." };
   }
 }
 
@@ -254,9 +386,9 @@ export async function toggleAutomation(id: string, active: boolean): Promise<Act
       entity_id: id,
     });
     revalidateIntegrations();
-    return { success: active ? "Automation activated." : "Automation deactivated." };
+    return { success: active ? "Automatización activada." : "Automatización pausada." };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to update automation." };
+    return { error: err instanceof Error ? err.message : "Error al cambiar estado de la automatización." };
   }
 }
 
@@ -272,8 +404,24 @@ export async function deleteAutomation(id: string): Promise<ActionState> {
       entity_id: id,
     });
     revalidateIntegrations();
-    return { success: "Automation deleted." };
+    return { success: "Regla de automatización eliminada." };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed to delete automation." };
+    return { error: err instanceof Error ? err.message : "Error al eliminar la automatización." };
+  }
+}
+
+export async function testAutomationRule(id: string): Promise<ActionState & { testResult?: AutomationTestResult }> {
+  const actor = await requirePermission("settings.update");
+
+  try {
+    const testResult = await AutomationsService.testRule(id, actor.id);
+    return {
+      success: `Prueba completada: ${testResult.conditionDetails}`,
+      testResult,
+    };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Error al probar la automatización.",
+    };
   }
 }

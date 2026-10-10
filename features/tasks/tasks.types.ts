@@ -29,3 +29,10 @@ export interface TaskFilters {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
+
+export interface TaskDependencyItem {
+  id: string;
+  task_id: string;
+  depends_on_task_id: string;
+  dependency_type: string;
+}
